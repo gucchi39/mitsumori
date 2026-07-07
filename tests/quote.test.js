@@ -1,5 +1,5 @@
 /* 見積もりエンジンのユニットテスト
- * 実行方法: node --test tests/ */
+ * 実行方法: node --test tests/quote.test.js */
 const { test } = require("node:test");
 const assert = require("node:assert");
 const { computeQuote, tierIndexFor, sizeClassFor } = require("../js/quote.js");
@@ -46,11 +46,11 @@ test("商品のみ（無地）: サイズ加算と警告", () => {
   // 890×5 + (890+110)×2 = 4450 + 2000 = 6450
   assert.equal(r.goodsAmount, 6450);
   assert.ok(r.warnings.some((w) => w.includes("無地")));
-  // 送料: 30000未満なので 880
+  // 送料: 30000未満なので 880（税込・課税対象外）
   assert.equal(r.shipping, 880);
-  // 税: floor((6450+880)*0.1)=733, 合計 8063
-  assert.equal(r.tax, 733);
-  assert.equal(r.total, 6450 + 880 + 733);
+  // 税は税抜小計にのみ課税: floor(6450*0.1)=645（送料は二重課税しない）
+  assert.equal(r.tax, 645);
+  assert.equal(r.total, 6450 + 645 + 880);
 });
 
 test("シルクスクリーン2色・20枚: 版代と数量スライド", () => {
@@ -139,12 +139,12 @@ test("複数箇所の組み合わせ（前面シルク＋左胸刺繍）", () =>
   // シルク1色 tier4=200, 刺繍S tier4=420
   assert.equal(r.printAmount, 200 * 50 + 420 * 50);
   assert.equal(r.setupAmount, 8800 + 15000);
-  // 明細行の整合性: 各行 amount = unitPrice × qty（送料以外）
+  // 明細行の整合性: 各行 amount = unitPrice × qty（送料は明細行に含めず別計上）
   for (const line of r.lines) {
     assert.equal(line.amount, line.unitPrice * line.qty, line.label);
   }
-  // 合計 = 小計 + 送料 + 税
-  assert.equal(r.total, r.subtotal + r.shipping + r.tax);
+  // 合計 = 小計（税抜） + 税 + 送料（税込）
+  assert.equal(r.total, r.subtotal + r.tax + r.shipping);
 });
 
 test("対応していない加工方法は警告（タオル×シルク）", () => {
@@ -156,4 +156,31 @@ test("対応していない加工方法は警告（タオル×シルク）", () 
     ],
   });
   assert.ok(r.warnings.some((w) => w.includes("対応していません")));
+});
+
+test("送料は税込のため二重課税しない（消費税は税抜小計のみ）", () => {
+  // 送料無料ライン未満で送料が発生するケース
+  const r = computeQuote({
+    productId: "tshirt",
+    quantities: { M: 10 }, // 890×10 = 8900（税抜）
+    placements: [],
+  });
+  assert.equal(r.subtotal, 8900);
+  assert.equal(r.shipping, 880);
+  assert.equal(r.tax, Math.floor(8900 * 0.1)); // 890、送料には課税しない
+  assert.equal(r.total, 8900 + 890 + 880);
+  // 明細行に送料は含めない（別計上）
+  assert.ok(!r.lines.some((l) => l.type === "shipping"));
+});
+
+test("未知の加工方法IDでもクラッシュせずエラーを返す", () => {
+  const r = computeQuote({
+    productId: "tshirt",
+    quantities: { M: 10 },
+    placements: [
+      { areaId: "front", areaName: "前面", methodId: "unknown_method", colorCount: 1, widthMm: 100, heightMm: 100, hasImage: false, objectCount: 1 },
+    ],
+  });
+  assert.equal(r.ok, false);
+  assert.ok(r.errors.length > 0);
 });

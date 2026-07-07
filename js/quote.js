@@ -183,19 +183,16 @@
       });
     }
 
-    /* --- 集計 --- */
+    /* --- 集計 ---
+     * 商品・加工（版代/型代含む）は税抜。消費税はこの税抜小計にのみ課税する。
+     * 送料は config で税込（税込880円 等）と定義されるため、二重課税しないよう
+     * 課税対象に含めず、税額計算後に加算する。 */
     const subtotal = goodsAmount + printAmount + setupAmount; // 税抜
-    const shipping = subtotal >= SHOP.freeShippingMin ? 0 : SHOP.shippingFee;
-    if (shipping === 0) {
-      // 送料無料でも明細行として見せる
-      lines.push({ type: "shipping", label: "送料", detail: `${yen(SHOP.freeShippingMin)}以上で無料`, unitPrice: 0, qty: 1, amount: 0 });
-    } else {
-      lines.push({ type: "shipping", label: "送料", detail: "全国一律", unitPrice: shipping, qty: 1, amount: shipping });
-    }
-    const taxable = subtotal + shipping;
-    const tax = Math.floor(taxable * SHOP.taxRate);
-    const total = taxable + tax;
-    const perPiece = Math.round(((goodsAmount + printAmount + setupAmount) * (1 + SHOP.taxRate)) / totalQty);
+    const shipping = subtotal >= SHOP.freeShippingMin ? 0 : SHOP.shippingFee; // 税込
+    const tax = roundTax(subtotal * SHOP.taxRate);
+    const total = subtotal + tax + shipping;
+    /* 参考単価（税込・送料除く）。丸めるため perPiece×数量 は総額と数円ずれ得る。 */
+    const perPiece = Math.round((subtotal + tax) / totalQty);
 
     return {
       ok: errors.length === 0,
@@ -211,10 +208,20 @@
       setupAmount,
       subtotal,
       shipping,
+      shippingFree: shipping === 0,
       tax,
       total,
       perPiece,
     };
+  }
+
+  /* 消費税の端数処理。事業者の会計方針に合わせて config で切替可能
+   * （SHOP.taxRounding: "floor" 切捨て / "round" 四捨五入 / "ceil" 切上げ） */
+  function roundTax(v) {
+    const mode = (SHOP && SHOP.taxRounding) || "floor";
+    if (mode === "round") return Math.round(v);
+    if (mode === "ceil") return Math.ceil(v);
+    return Math.floor(v);
   }
 
   const API = { computeQuote, tierIndexFor, sizeClassFor, yen };

@@ -12,6 +12,8 @@
   let svg = null;
   let callbacks = { onChange: () => {}, onSelect: () => {} };
   let measureCtx = null;
+  /* index.html の Google Fonts <link> URL（エクスポートSVGに @import で埋め込む） */
+  let FONT_IMPORT_URL = "";
 
   const state = {
     product: null,
@@ -34,6 +36,76 @@
 
   function esc(s) {
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  /* 属性コンテキストの数値を安全化（NaN/文字列混入・XSS を防ぐ） */
+  function n(v) { const x = Number(v); return isFinite(x) ? x : 0; }
+  /* CSSカラーとして安全な値のみ許可（16進 or "none"）。それ以外は黒へ */
+  function safeColor(v) {
+    if (typeof v === "string" && (/^#[0-9a-fA-F]{3,8}$/.test(v) || v === "none")) return v;
+    return "#111111";
+  }
+  /* 画像は data:image/... のみ許可（javascript: 等を排除） */
+  function safeHref(v) {
+    return typeof v === "string" && /^data:image\//.test(v) ? v : "";
+  }
+  function isValidFontId(id) { return CONFIG.FONTS.some((f) => f.id === id); }
+
+  /* ---- 信頼できない入力（共有URL・読込JSON・自動保存）の無害化 ----
+   * これらは attacker 制御になり得るため、既知の型・値のみへ作り直す。 */
+  function numOr(v, def, min, max) {
+    let x = Number(v);
+    if (!isFinite(x)) x = def;
+    if (min != null) x = Math.max(min, x);
+    if (max != null) x = Math.min(max, x);
+    return x;
+  }
+  function sanitizeObject(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const base = {
+      id: typeof raw.id === "string" && /^[\w-]{1,40}$/.test(raw.id) ? raw.id : uid(),
+      x: numOr(raw.x, VB_W / 2), y: numOr(raw.y, VB_H / 2),
+      scale: numOr(raw.scale, 1, 0.02, 40), rotation: numOr(raw.rotation, 0),
+    };
+    if (raw.type === "text") {
+      return Object.assign(base, {
+        type: "text",
+        text: String(raw.text == null ? "" : raw.text).slice(0, 200),
+        fontId: isValidFontId(raw.fontId) ? raw.fontId : "gothic",
+        fontSize: numOr(raw.fontSize, 40, 4, 400),
+        fill: safeColor(raw.fill), stroke: safeColor(raw.stroke),
+        strokeWidth: numOr(raw.strokeWidth, 0, 0, 40),
+        letterSpacing: numOr(raw.letterSpacing, 0, -50, 200),
+        arch: numOr(raw.arch, 0, -100, 100),
+        vertical: !!raw.vertical,
+      });
+    }
+    if (raw.type === "stamp") {
+      if (!Stamps.getStamp(raw.stampId)) return null;
+      return Object.assign(base, { type: "stamp", stampId: raw.stampId, fill: safeColor(raw.fill), flipX: !!raw.flipX });
+    }
+    if (raw.type === "image") {
+      const href = safeHref(raw.href);
+      if (!href) return null;
+      return Object.assign(base, {
+        type: "image", href,
+        natW: numOr(raw.natW, 100, 1), natH: numOr(raw.natH, 100, 1),
+        w: numOr(raw.w, 100, 1), h: numOr(raw.h, 100, 1), flipX: !!raw.flipX,
+      });
+    }
+    return null;
+  }
+  /* designs 全体を無害化。未知の methodId は先頭の対応方法へ寄せる */
+  function sanitizeDesigns(rawDesigns, product) {
+    const clean = {};
+    const validAreas = new Set(product.printAreas.map((a) => a.id));
+    for (const [areaId, d] of Object.entries(rawDesigns || {})) {
+      if (!validAreas.has(areaId) || !d || typeof d !== "object") continue;
+      const methodId = product.methods.includes(d.methodId) ? d.methodId : product.methods[0];
+      const objects = Array.isArray(d.objects) ? d.objects.map(sanitizeObject).filter(Boolean) : [];
+      clean[areaId] = { methodId, objects };
+    }
+    return clean;
   }
 
   function currentArea() {
@@ -70,17 +142,20 @@
     return pt.matrixTransform(svg.getScreenCTM().inverse());
   }
 
-  /* テキストの実寸幅を canvas で計測 */
-  function measureText(obj) {
+  /* 1行の実寸幅（字間込み）を canvas で計測 */
+  function measureLine(obj, line) {
     if (!measureCtx) measureCtx = document.createElement("canvas").getContext("2d");
     const font = CONFIG.FONTS.find((f) => f.id === obj.fontId) || CONFIG.FONTS[0];
-    measureCtx.font = `${font.weight} ${obj.fontSize}px ${font.family}`;
+    measureCtx.font = `${font.weight} ${n(obj.fontSize)}px ${font.family}`;
+    const s = line == null ? String(obj.text || " ") : String(line);
+    return measureCtx.measureText(s).width + (Number(obj.letterSpacing) || 0) * Math.max(0, s.length - 1);
+  }
+
+  /* テキストの実寸幅（最長行）と行配列 */
+  function measureText(obj) {
     const lines = String(obj.text || " ").split("\n");
     let w = 0;
-    for (const line of lines) {
-      const base = measureCtx.measureText(line).width;
-      w = Math.max(w, base + (obj.letterSpacing || 0) * Math.max(0, line.length - 1));
-    }
+    for (const line of lines) w = Math.max(w, measureLine(obj, line));
     return { w, lines };
   }
 
@@ -129,33 +204,34 @@
 
   function textMarkup(obj) {
     const font = CONFIG.FONTS.find((f) => f.id === obj.fontId) || CONFIG.FONTS[0];
-    const common = `font-family="${esc(font.family)}" font-weight="${font.weight}" font-size="${obj.fontSize}"` +
-      ` fill="${obj.fill}" letter-spacing="${obj.letterSpacing || 0}"` +
-      (obj.strokeWidth > 0 ? ` stroke="${obj.stroke}" stroke-width="${obj.strokeWidth}" paint-order="stroke" stroke-linejoin="round"` : "");
+    const common = `font-family="${esc(font.family)}" font-weight="${font.weight}" font-size="${n(obj.fontSize)}"` +
+      ` fill="${safeColor(obj.fill)}" letter-spacing="${n(obj.letterSpacing)}"` +
+      (obj.strokeWidth > 0 ? ` stroke="${safeColor(obj.stroke)}" stroke-width="${n(obj.strokeWidth)}" paint-order="stroke" stroke-linejoin="round"` : "");
     const arch = Number(obj.arch) || 0;
     const { w, lines } = measureText(obj);
 
     /* 縦書き（1行 = 1列、右から左へ） */
     if (obj.vertical) {
-      const lh = obj.fontSize * 1.15;
-      const n = lines.length;
+      const lh = n(obj.fontSize) * 1.15;
+      const cols = lines.length;
       return lines.map((line, i) =>
-        `<text ${common} x="${((n - 1) / 2 - i) * lh}" y="0" text-anchor="middle" dominant-baseline="central"` +
+        `<text ${common} x="${((cols - 1) / 2 - i) * lh}" y="0" text-anchor="middle" dominant-baseline="central"` +
         ` style="writing-mode:vertical-rl;text-orientation:upright">${esc(line) || "　"}</text>`
       ).join("");
     }
 
     if (arch !== 0 && lines.length) {
-      const textJoined = lines.join("　");
-      const chord = Math.max(w, 20);
+      /* 弦長は「結合後テキスト」の実幅から算出（1行幅だと複数行で後半が消える） */
+      const joinedW = measureLine({ ...obj, text: lines.join("　") });
+      const chord = Math.max(joinedW, w, 20);
       const s = (arch / 100) * chord * 0.4;
       const R = (chord * chord / 4 + s * s) / (2 * Math.abs(s));
       const sweep = arch > 0 ? 1 : 0;
       const d = `M ${-chord / 2} ${s / 2} A ${R} ${R} 0 0 ${sweep} ${chord / 2} ${s / 2}`;
-      return `<path id="tp-${obj.id}" d="${d}" fill="none"/>` +
-        `<text ${common} dominant-baseline="central"><textPath href="#tp-${obj.id}" startOffset="50%" text-anchor="middle">${esc(textJoined)}</textPath></text>`;
+      return `<path id="tp-${esc(obj.id)}" d="${d}" fill="none"/>` +
+        `<text ${common} dominant-baseline="central"><textPath href="#tp-${esc(obj.id)}" startOffset="50%" text-anchor="middle">${esc(lines.join("　"))}</textPath></text>`;
     }
-    const lh = obj.fontSize * 1.15;
+    const lh = n(obj.fontSize) * 1.15;
     const y0 = -((lines.length - 1) * lh) / 2;
     const tspans = lines
       .map((line, i) => `<tspan x="0" y="${y0 + i * lh}">${esc(line) || " "}</tspan>`)
@@ -166,11 +242,13 @@
   function stampMarkup(obj) {
     const st = Stamps.getStamp(obj.stampId);
     if (!st) return "";
-    return `<g transform="translate(-60 -60) scale(1.2)">${Stamps.renderStamp(st, obj.fill)}</g>`;
+    return `<g transform="translate(-60 -60) scale(1.2)">${Stamps.renderStamp(st, safeColor(obj.fill))}</g>`;
   }
 
   function imageMarkup(obj) {
-    return `<image href="${obj.href}" x="${-obj.w / 2}" y="${-obj.h / 2}" width="${obj.w}" height="${obj.h}" preserveAspectRatio="xMidYMid meet"/>`;
+    const href = safeHref(obj.href);
+    if (!href) return "";
+    return `<image href="${esc(href)}" x="${-n(obj.w) / 2}" y="${-n(obj.h) / 2}" width="${n(obj.w)}" height="${n(obj.h)}" preserveAspectRatio="xMidYMid meet"/>`;
   }
 
   function objMarkup(obj, editable) {
@@ -179,9 +257,23 @@
     else if (obj.type === "stamp") inner = stampMarkup(obj);
     else if (obj.type === "image") inner = imageMarkup(obj);
     const flip = obj.flipX ? " scale(-1 1)" : "";
-    return `<g class="obj${editable ? " editable" : ""}" data-id="${obj.id}"` +
-      ` transform="translate(${obj.x} ${obj.y}) rotate(${obj.rotation}) scale(${obj.scale})${flip}">` +
+    return `<g class="obj${editable ? " editable" : ""}" data-id="${esc(obj.id)}"` +
+      ` transform="translate(${n(obj.x)} ${n(obj.y)}) rotate(${n(obj.rotation)}) scale(${n(obj.scale)})${flip}">` +
       `<g class="obj-inner">${inner}</g></g>`;
+  }
+
+  /* プリント範囲の案内ラベル。加工方法に長辺上限がある場合は併記して
+   * 「案内サイズいっぱいに作ると毎回警告が出る」矛盾を避ける */
+  function areaSizeLabel(a) {
+    const base = `最大 ${a.mmW / 10}×${a.mmH / 10}cm`;
+    const method = CONFIG.METHODS[design(a.id).methodId];
+    if (method && method.sizeClasses && method.sizeClasses.length) {
+      const maxLong = method.sizeClasses[method.sizeClasses.length - 1].maxMm;
+      if (maxLong < Math.max(a.mmW, a.mmH)) {
+        return `${base}／${method.short}は長辺${maxLong / 10}cmまで`;
+      }
+    }
+    return base;
   }
 
   /* ---------------- ステージ描画 ---------------- */
@@ -221,7 +313,7 @@
             <rect x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}" fill="none"
               stroke="${active ? "#ff6a13" : "rgba(120,130,150,0.45)"}" stroke-width="${active ? 2.5 : 1.5}"
               stroke-dasharray="8 6"/>
-            ${active ? `<text x="${a.x + 4}" y="${a.y - 8}" font-size="17" fill="#ff6a13" font-family="sans-serif">${esc(a.name)}（最大 ${a.mmW / 10}×${a.mmH / 10}cm）</text>` : ""}
+            ${active ? `<text x="${a.x + 4}" y="${a.y - 8}" font-size="17" fill="#ff6a13" font-family="sans-serif">${esc(a.name)}（${esc(areaSizeLabel(a))}）</text>` : ""}
           </g>`;
         })
         .join("");
@@ -338,6 +430,7 @@
     const pt = svgPoint(evt);
     const o = drag.obj;
     const area = currentArea();
+    drag.moved = true; // 実際に動いた場合のみ履歴に積む（選択クリックでは積まない）
 
     if (drag.mode === "move") {
       let nx = drag.origX + (pt.x - drag.startPt.x);
@@ -369,10 +462,21 @@
 
   function onPointerUp() {
     if (!drag) return;
+    const moved = drag.moved;
     drag = null;
     dragGuides.v = dragGuides.h = false;
-    commit();
+    /* 単なる選択クリック（未移動）では commit しない
+     * → redo履歴の破棄・無変更スナップショットの蓄積を防ぐ */
+    if (moved) commit();
     callbacks.onSelect(selectedObj());
+  }
+
+  /* オブジェクト中心をプリント範囲内にクランプ */
+  function clampToArea(o) {
+    const a = currentArea();
+    if (!a) return;
+    o.x = Math.max(a.x, Math.min(a.x + a.w, o.x));
+    o.y = Math.max(a.y, Math.min(a.y + a.h, o.y));
   }
 
   function onKeyDown(evt) {
@@ -393,10 +497,11 @@
     switch (evt.key) {
       case "Delete":
       case "Backspace": deleteSelected(); break;
-      case "ArrowLeft": o.x -= step; commit(); break;
-      case "ArrowRight": o.x += step; commit(); break;
-      case "ArrowUp": o.y -= step; commit(); break;
-      case "ArrowDown": o.y += step; commit(); break;
+      /* 矢印移動もドラッグ同様に範囲内へクランプ（範囲外配置＝過大見積もり防止） */
+      case "ArrowLeft": o.x -= step; clampToArea(o); commit(); break;
+      case "ArrowRight": o.x += step; clampToArea(o); commit(); break;
+      case "ArrowUp": o.y -= step; clampToArea(o); commit(); break;
+      case "ArrowDown": o.y += step; clampToArea(o); commit(); break;
       default: handled = false;
     }
     if (handled) evt.preventDefault();
@@ -550,17 +655,23 @@
 
   /* ---------------- 見積もり連携 ---------------- */
 
-  /* オブジェクトの変換後バウンディングボックス（ステージ座標） */
+  /* オブジェクトの変換後バウンディングボックス（ステージ座標）
+   * 縁取り(stroke)は paint-order:stroke で geometry の外側へ strokeWidth/2 はみ出す
+   * ため実寸に含める（含めないとサイズ区分が1段安く判定され過小請求）。 */
   function objStageBBox(obj) {
     const node = svg.querySelector(`.obj[data-id="${obj.id}"] .obj-inner`);
     if (!node) return null;
     let bb;
     try { bb = node.getBBox(); } catch (e) { return null; }
+    let { x, y, width, height } = bb;
+    if (obj.type === "text" && obj.strokeWidth > 0) {
+      const half = obj.strokeWidth / 2;
+      x -= half; y -= half; width += obj.strokeWidth; height += obj.strokeWidth;
+    }
     const rad = (obj.rotation * Math.PI) / 180;
     const cos = Math.cos(rad), sin = Math.sin(rad);
     const corners = [
-      [bb.x, bb.y], [bb.x + bb.width, bb.y],
-      [bb.x, bb.y + bb.height], [bb.x + bb.width, bb.y + bb.height],
+      [x, y], [x + width, y], [x, y + height], [x + width, y + height],
     ].map(([px, py]) => {
       const sx = px * obj.scale, sy = py * obj.scale;
       return [obj.x + sx * cos - sy * sin, obj.y + sx * sin + sy * cos];
@@ -619,32 +730,38 @@
       let hasImage = false;
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       let lowRes = false;
+      let visibleCount = 0; // プリント範囲に少しでも掛かるオブジェクト数
       const pxPerMm = a.w / a.mmW;
+      const ax2 = a.x + a.w, ay2 = a.y + a.h;
 
       for (const o of d.objects) {
+        const bb = objStageBBox(o);
+        /* 範囲外（clipPathで印刷されない）オブジェクトは色数・実寸・数量に
+         * 一切算入しない（範囲外へ退避した不要物で価格が膨らむのを防ぐ） */
+        if (!bb) continue;
+        const ix1 = Math.max(bb.x, a.x), iy1 = Math.max(bb.y, a.y);
+        const ix2 = Math.min(bb.x + bb.w, ax2), iy2 = Math.min(bb.y + bb.h, ay2);
+        if (ix2 <= ix1 || iy2 <= iy1) continue; // 交差なし＝範囲外
+
+        visibleCount++;
         if (o.type === "image") {
           hasImage = true;
+          const dispW = (o.w * o.scale) / pxPerMm; // mm
+          const dpi = o.natW / (dispW / 25.4);
+          if (dpi < 100) lowRes = true;
         } else {
           if (o.fill) colors.add(String(o.fill).toLowerCase());
           if (o.type === "text" && o.strokeWidth > 0 && o.stroke) colors.add(String(o.stroke).toLowerCase());
         }
-        const bb = objStageBBox(o);
-        if (bb) {
-          minX = Math.min(minX, bb.x); minY = Math.min(minY, bb.y);
-          maxX = Math.max(maxX, bb.x + bb.w); maxY = Math.max(maxY, bb.y + bb.h);
-        }
-        if (o.type === "image") {
-          const dispW = (o.w * o.scale) / pxPerMm; // mm
-          const dpi = o.natW / (dispW / 25.4);
-          if (dpi < 100) lowRes = true;
-        }
+        /* 範囲でクリップした矩形だけを実寸の union に含める */
+        minX = Math.min(minX, ix1); minY = Math.min(minY, iy1);
+        maxX = Math.max(maxX, ix2); maxY = Math.max(maxY, iy2);
       }
 
-      /* プリント範囲でクリップした実寸 */
-      const cx1 = Math.max(minX, a.x), cy1 = Math.max(minY, a.y);
-      const cx2 = Math.min(maxX, a.x + a.w), cy2 = Math.min(maxY, a.y + a.h);
-      const wMm = Math.max(0, (cx2 - cx1) / pxPerMm);
-      const hMm = Math.max(0, (cy2 - cy1) / pxPerMm);
+      if (visibleCount === 0) continue; // 範囲内に何も無い＝無地扱い（加工費なし）
+
+      const wMm = Math.max(0, (maxX - minX) / pxPerMm);
+      const hMm = Math.max(0, (maxY - minY) / pxPerMm);
 
       result.push({
         areaId: a.id,
@@ -655,7 +772,7 @@
         heightMm: hMm,
         hasImage,
         lowRes,
-        objectCount: d.objects.length,
+        objectCount: visibleCount,
       });
     }
     if (savedArea !== state.areaId) {
@@ -720,30 +837,56 @@
 
   /* ---------------- サムネイル・エクスポート ---------------- */
 
-  /** プリント位置選択用のミニサムネイルSVG */
+  /** プリント位置選択用のミニサムネイルSVG（印刷範囲でクリップ＝はみ出しは映さない） */
   function areaThumbSVG(a) {
     const d = state.designs[a.id];
     const pad = 10;
-    const inner = d && d.objects.length ? d.objects.map((o) => objMarkup(o, false)).join("") : "";
+    const cid = `thumbclip-${a.id}`;
+    const inner = d && d.objects.length
+      ? `<g clip-path="url(#${cid})">${d.objects.map((o) => objMarkup(o, false)).join("")}</g>`
+      : "";
     return `<svg viewBox="${a.x - pad} ${a.y - pad} ${a.w + pad * 2} ${a.h + pad * 2}" xmlns="http://www.w3.org/2000/svg">
+      <defs><clipPath id="${cid}"><rect x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}"/></clipPath></defs>
       <rect x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}" fill="#fff" stroke="#c8cdd6" stroke-width="2" stroke-dasharray="6 4"/>${inner}</svg>`;
   }
 
-  /** 現在のビュー全体をスタンドアロンSVG文字列として書き出し */
-  function exportSVG() {
+  /** デザインが存在するビュー（front/back）を商品順で返す */
+  function designViews() {
+    if (!state.product) return [];
+    const views = [];
+    for (const a of state.product.printAreas) {
+      const d = state.designs[a.id];
+      if (d && d.objects.length && !views.includes(a.view)) views.push(a.view);
+    }
+    return views;
+  }
+
+  /** 指定ビュー（省略時は現在ビュー）をスタンドアロンSVG文字列として書き出し */
+  function exportSVG(view) {
+    const savedArea = state.areaId;
     const wasPreview = state.preview;
+    if (view) {
+      const target = state.product.printAreas.find((a) => a.view === view);
+      if (target) state.areaId = target.id;
+    }
     state.preview = true;
     render();
+    /* Web フォントの @import を埋め込み、ブラウザで開いた際に書体が再現されるようにする
+     * （Illustrator 等フォント未所持の環境では代替書体になるため、確定入稿はアウトライン化推奨） */
+    const fontStyle = FONT_IMPORT_URL
+      ? `<defs><style type="text/css">@import url("${FONT_IMPORT_URL}");</style></defs>`
+      : "";
     const markup = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${VB_W} ${VB_H}" width="${VB_W}" height="${VB_H}">` +
-      `<rect width="${VB_W}" height="${VB_H}" fill="#ffffff"/>` + svg.innerHTML + `</svg>`;
+      fontStyle + `<rect width="${VB_W}" height="${VB_H}" fill="#ffffff"/>` + svg.innerHTML + `</svg>`;
     state.preview = wasPreview;
+    state.areaId = savedArea;
     render();
     return markup;
   }
 
-  function exportPNG(scale) {
+  function exportPNG(scale, view) {
     return new Promise((resolve, reject) => {
-      const markup = exportSVG();
+      const markup = exportSVG(view);
       const blob = new Blob([markup], { type: "image/svg+xml;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const img = new Image();
@@ -769,6 +912,9 @@
     init(svgEl, cbs) {
       svg = svgEl;
       Object.assign(callbacks, cbs || {});
+      /* エクスポートSVGに埋め込むフォント @import URL を <link> から取得 */
+      const link = document.querySelector('link[href*="fonts.googleapis.com/css2"]');
+      if (link) FONT_IMPORT_URL = link.getAttribute("href");
       svg.addEventListener("pointerdown", onPointerDown);
       svg.addEventListener("pointermove", onPointerMove);
       svg.addEventListener("pointerup", onPointerUp);
@@ -810,8 +956,10 @@
     },
 
     setMethod(areaId, methodId) {
-      design(areaId).methodId = methodId;
-      callbacks.onChange();
+      const d = design(areaId);
+      if (d.methodId === methodId) return;
+      d.methodId = methodId;
+      commit(); // 加工方法の変更を履歴の1ステップとして積む（undoで黙って戻らないように）
     },
 
     setZoom(z) { state.zoom = Math.max(0.5, Math.min(4, z)); applyViewBox(); },
@@ -832,7 +980,7 @@
     duplicateSelected, centerSelected, flipSelected,
     applyTemplate, templateThumbSVG,
     undo, redo,
-    getPlacements, areaThumbSVG, exportSVG, exportPNG,
+    getPlacements, areaThumbSVG, exportSVG, exportPNG, designViews,
 
     get state() { return state; },
     selectedObj,
@@ -852,8 +1000,9 @@
       const product = CONFIG.PRODUCTS.find((p) => p.id === data.productId);
       if (!product) return false;
       state.product = product;
-      state.colorId = data.colorId || product.colors[0].id;
-      state.designs = data.designs || {};
+      state.colorId = product.colors.some((c) => c.id === data.colorId) ? data.colorId : product.colors[0].id;
+      /* 信頼できない入力を無害化してから採用（XSS・不正値・未知methodId対策） */
+      state.designs = sanitizeDesigns(data.designs, product);
       state.areaId = data.areaId && product.printAreas.some((a) => a.id === data.areaId)
         ? data.areaId : product.printAreas[0].id;
       state.selectedId = null;

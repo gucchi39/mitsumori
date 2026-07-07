@@ -8,6 +8,21 @@
   const $ = (sel) => document.querySelector(sel);
   const AUTOSAVE_KEY = "mitsumori.autosave.v1";
 
+  /* 未知の加工方法IDでも落ちないフォールバック付き参照 */
+  function methodOf(id) {
+    return METHODS[id] || { id, name: "加工", short: "加工", icon: "•", desc: "", colorMode: "free", maxColors: Infinity, allowImages: true, setupFee: null };
+  }
+  /* 数量入力を非負整数に正規化（見積もり・注文メール・共有URLの値ズレ防止） */
+  function cleanQty(v) {
+    const n = Math.floor(Number(v));
+    return isFinite(n) && n > 0 ? Math.min(n, 99999) : 0;
+  }
+  function cleanQuantities(raw) {
+    const out = {};
+    for (const k in raw || {}) { const q = cleanQty(raw[k]); if (q) out[k] = q; }
+    return out;
+  }
+
   const app = {
     step: 1,
     tab: "color",
@@ -526,7 +541,7 @@
     if (!p) { box.innerHTML = ""; return; }
     const area = p.printAreas.find((a) => a.id === Editor.state.areaId);
     const d = Editor.designFor(area.id);
-    const m = METHODS[d.methodId];
+    const m = methodOf(d.methodId);
     const pl = Editor.getPlacements().find((x) => x.areaId === area.id);
     box.innerHTML = `
       <h3>編集中の位置</h3>
@@ -572,14 +587,14 @@
     box.innerHTML = p.sizes.map((s) => {
       const sur = p.sizeSurcharge[s];
       return `<div class="size-cell">
-        <label>${s === "FREE" ? "数量" : s}</label>
-        <input type="number" min="0" max="9999" inputmode="numeric" data-size="${s}" value="${app.quantities[s] || ""}" placeholder="0">
+        <label>${s === "FREE" ? "数量" : escapeHtml(s)}</label>
+        <input type="number" min="0" max="99999" inputmode="numeric" data-size="${escapeHtml(s)}" value="${cleanQty(app.quantities[s]) || ""}" placeholder="0">
         ${sur ? `<span class="size-note">+¥${sur}/枚</span>` : ""}
       </div>`;
     }).join("");
     box.querySelectorAll("input[data-size]").forEach((inp) =>
       inp.addEventListener("input", () => {
-        app.quantities[inp.dataset.size] = Number(inp.value) || 0;
+        app.quantities[inp.dataset.size] = cleanQty(inp.value);
         refreshQuote();
         autosave();
       })
@@ -627,7 +642,7 @@
       const a = Editor.state.product.printAreas.find((x) => x.id === pl.areaId);
       return `<div class="ds-item">${Editor.areaThumbSVG(a)}
         <div class="ds-name">${pl.areaName}</div>
-        <div class="ds-meta">${METHODS[pl.methodId].short}・${pl.hasImage ? "フルカラー" : pl.colorCount + "色"}<br>約${(pl.widthMm / 10).toFixed(1)}×${(pl.heightMm / 10).toFixed(1)}cm</div>
+        <div class="ds-meta">${methodOf(pl.methodId).short}・${pl.hasImage ? "フルカラー" : pl.colorCount + "色"}<br>約${(pl.widthMm / 10).toFixed(1)}×${(pl.heightMm / 10).toFixed(1)}cm</div>
       </div>`;
     }).join("");
 
@@ -650,10 +665,11 @@
         <tbody>${rows}</tbody>
       </table>
       <div class="quote-totals">
-        <div class="qt-row"><span>小計（税抜）</span><span>${Quote.yen(q.subtotal + q.shipping)}</span></div>
+        <div class="qt-row"><span>小計（税抜）</span><span>${Quote.yen(q.subtotal)}</span></div>
         <div class="qt-row"><span>消費税（${Math.round(SHOP.taxRate * 100)}%）</span><span>${Quote.yen(q.tax)}</span></div>
+        <div class="qt-row"><span>送料${q.shippingFree ? "" : "（税込）"}</span><span>${q.shippingFree ? "無料" : Quote.yen(q.shipping)}</span></div>
         <div class="qt-row total"><span>合計（税込）</span><span>${Quote.yen(q.total)}</span></div>
-        <div class="qt-row per"><span>1枚あたり（税込・送料除く）</span><span>${Quote.yen(q.perPiece)} × ${q.totalQty}枚</span></div>
+        <div class="qt-row per"><span>参考：1枚あたり（税込・送料除く）</span><span>約 ${Quote.yen(q.perPiece)}</span></div>
       </div>`;
   }
 
@@ -682,7 +698,7 @@
 
     const designs = placements.map((pl) => {
       const a = Editor.state.product.printAreas.find((x) => x.id === pl.areaId);
-      return `<figure>${Editor.areaThumbSVG(a)}<figcaption>${pl.areaName}（${METHODS[pl.methodId].short}）</figcaption></figure>`;
+      return `<figure>${Editor.areaThumbSVG(a)}<figcaption>${escapeHtml(pl.areaName)}（${methodOf(pl.methodId).short}）</figcaption></figure>`;
     }).join("");
 
     $("#quoteSheet").innerHTML = `
@@ -703,8 +719,9 @@
         <thead><tr><th>品名・摘要</th><th>単価</th><th>数量</th><th>金額</th></tr></thead>
         <tbody>
           ${rows}
-          <tr><td colspan="3" class="num">小計（税抜）</td><td class="num">${Quote.yen(q.subtotal + q.shipping)}</td></tr>
+          <tr><td colspan="3" class="num">小計（税抜）</td><td class="num">${Quote.yen(q.subtotal)}</td></tr>
           <tr><td colspan="3" class="num">消費税（${Math.round(SHOP.taxRate * 100)}%）</td><td class="num">${Quote.yen(q.tax)}</td></tr>
+          <tr><td colspan="3" class="num">送料${q.shippingFree ? "" : "（税込）"}</td><td class="num">${q.shippingFree ? "無料" : Quote.yen(q.shipping)}</td></tr>
           <tr><td colspan="3" class="num"><b>合計（税込）</b></td><td class="num"><b>${Quote.yen(q.total)}</b></td></tr>
         </tbody>
       </table>
@@ -731,7 +748,7 @@
       `商品：${p.name}`,
       `カラー：${color ? color.name : "-"}`,
       `数量：${sizes}`,
-      ...placements.map((pl) => `・${pl.areaName}：${METHODS[pl.methodId].name} ${pl.hasImage ? "フルカラー" : pl.colorCount + "色"} 約${(pl.widthMm / 10).toFixed(1)}×${(pl.heightMm / 10).toFixed(1)}cm`),
+      ...placements.map((pl) => `・${pl.areaName}：${methodOf(pl.methodId).name} ${pl.hasImage ? "フルカラー" : pl.colorCount + "色"} 約${(pl.widthMm / 10).toFixed(1)}×${(pl.heightMm / 10).toFixed(1)}cm`),
       "",
       q && q.ok ? `概算合計：${Quote.yen(q.total)}（税込）` : "概算：未計算",
       "",
@@ -772,8 +789,8 @@
       try {
         const data = JSON.parse(reader.result);
         if (!Editor.load(data.editor)) throw new Error("bad data");
-        app.quantities = data.quantities || {};
-        if (data.customerName) $("#customerName").value = data.customerName;
+        app.quantities = cleanQuantities(data.quantities);
+        if (data.customerName && $("#customerName")) $("#customerName").value = String(data.customerName).slice(0, 100);
         goStep(2);
         renderEditorPanels();
       } catch (e) {
@@ -783,15 +800,30 @@
     reader.readAsText(file);
   }
 
+  /* 前面・背面など、デザインのある全ビューをビュー名付きで書き出す
+   * （最後に見ていた面だけ書き出して反対面が入稿から欠落するのを防ぐ） */
+  const VIEW_LABEL = { front: "前面", back: "背面" };
+
   function downloadSVG() {
     if (!Editor.state.product) return;
-    download(`design_${stamp()}.svg`, new Blob([Editor.exportSVG()], { type: "image/svg+xml" }));
+    const views = Editor.designViews();
+    if (views.length <= 1) {
+      download(`design_${stamp()}.svg`, new Blob([Editor.exportSVG(views[0])], { type: "image/svg+xml" }));
+    } else {
+      views.forEach((v) => download(`design_${VIEW_LABEL[v] || v}_${stamp()}.svg`, new Blob([Editor.exportSVG(v)], { type: "image/svg+xml" })));
+      toast(`${views.length}面（${views.map((v) => VIEW_LABEL[v] || v).join("・")}）のSVGを書き出しました`);
+    }
   }
 
   function downloadPNG() {
     if (!Editor.state.product) return;
-    Editor.exportPNG(2)
-      .then((blob) => download(`design_${stamp()}.png`, blob))
+    const views = Editor.designViews();
+    const list = views.length ? views : [undefined];
+    Promise.all(list.map((v) => Editor.exportPNG(2, v).then((blob) => ({ v, blob }))))
+      .then((items) => {
+        items.forEach(({ v, blob }) => download(`design${v ? "_" + (VIEW_LABEL[v] || v) : ""}_${stamp()}.png`, blob));
+        if (items.length > 1) toast(`${items.length}面のPNGを書き出しました`);
+      })
       .catch(() => alert("PNGの生成に失敗しました。SVG形式をお試しください。"));
   }
 
@@ -826,7 +858,11 @@
       removed += (d.objects || []).length - objs.length;
       designs[k] = { methodId: d.methodId, objects: objs };
     }
-    const payload = JSON.stringify({ ...data, designs, q: app.quantities });
+    const payload = JSON.stringify({
+      ...data, designs,
+      quantities: cleanQuantities(app.quantities),
+      customerName: ($("#customerName") ? $("#customerName").value : "").slice(0, 100),
+    });
     let url;
     if (typeof CompressionStream !== "undefined") {
       url = location.origin + location.pathname + "#d=" + b64urlEncode(await deflate(payload));
@@ -858,35 +894,51 @@
   async function applyShareHash() {
     const h = location.hash || "";
     if (!h.startsWith("#d=") && !h.startsWith("#D=")) return false;
+    const compressed = h[1] === "d";
+    if (compressed && typeof DecompressionStream === "undefined") {
+      toast("お使いのブラウザはこの共有リンクを開けません。最新のブラウザでお試しください", "warn");
+      return false;
+    }
     try {
       const raw = h.slice(3);
-      const json = h[1] === "d"
+      const json = compressed
         ? await inflate(b64urlDecode(raw))
         : new TextDecoder().decode(b64urlDecode(raw));
       const data = JSON.parse(json);
-      if (!Editor.load(data)) return false;
-      app.quantities = data.q || {};
+      /* 共有デザインの読み込みで、閲覧者が作業中の自動保存を消さない
+       * （実際に編集を始めるまで autosave をロックする） */
+      shareLocked = true;
+      if (!Editor.load(data)) { shareLocked = false; return false; }
+      app.quantities = cleanQuantities(data.quantities || data.q);
+      if ($("#customerName")) $("#customerName").value = (data.customerName || "").slice(0, 100);
+      ["pointerdown", "keydown"].forEach((ev) =>
+        document.addEventListener(ev, function unlock() { shareLocked = false; document.removeEventListener(ev, unlock); }, { once: true }));
       goStep(2);
       renderEditorPanels();
       toast("共有されたデザインを読み込みました");
       return true;
     } catch (e) {
+      shareLocked = false;
       console.warn("share hash decode failed", e);
+      toast("共有リンクを読み込めませんでした", "warn");
       return false;
     }
   }
 
   /* ================= 自動保存 ================= */
 
+  let shareLocked = false;
+
   const autosave = debounce(() => {
-    if (!Editor.state.product) return;
+    if (!Editor.state.product || shareLocked) return;
     try {
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
         editor: Editor.serialize(),
-        quantities: app.quantities,
+        quantities: cleanQuantities(app.quantities),
+        customerName: $("#customerName") ? $("#customerName").value : "",
         savedAt: Date.now(),
       }));
-    } catch (e) { /* 容量超過などは無視 */ }
+    } catch (e) { /* 容量超過などは無視（画像入りは localStorage 上限に注意） */ }
   }, 500);
 
   function checkAutosave() {
@@ -896,11 +948,17 @@
     const banner = $("#restoreBanner");
     banner.hidden = false;
     $("#btnRestore").addEventListener("click", () => {
-      if (Editor.load(data.editor)) {
-        app.quantities = data.quantities || {};
+      try {
+        if (Editor.load(data.editor)) {
+          app.quantities = cleanQuantities(data.quantities);
+          if ($("#customerName")) $("#customerName").value = data.customerName || "";
+          banner.hidden = true;
+          goStep(2);
+          renderEditorPanels();
+        }
+      } catch (e) {
+        toast("保存データを復元できませんでした", "warn");
         banner.hidden = true;
-        goStep(2);
-        renderEditorPanels();
       }
     });
     $("#btnDiscard").addEventListener("click", () => {

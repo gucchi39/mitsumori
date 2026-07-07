@@ -14,7 +14,8 @@ const SHOP = {
   email: "info@example.com",
   address: "〒000-0000 ○○県○○市○○町 0-0-0",
   taxRate: 0.10,                            // 消費税率
-  shippingFee: 880,                         // 送料（税込・全国一律）
+  taxRounding: "floor",                     // 消費税の端数処理: "floor"切捨て / "round"四捨五入 / "ceil"切上げ
+  shippingFee: 880,                         // 送料（税込・全国一律）※税込のため消費税は二重課税しません
   freeShippingMin: 30000,                   // この金額（税抜）以上で送料無料
   quoteValidDays: 30,                       // 見積書の有効期限（日）
   minOrderQty: 1,                           // 最小注文枚数
@@ -128,7 +129,7 @@ const METHODS = {
     sizeClasses: [
       { id: "S", label: "Sサイズ（長辺10cmまで）", maxMm: 100, fee: [900, 700, 600, 520, 450, 390] },
       { id: "M", label: "Mサイズ（長辺25cmまで）", maxMm: 250, fee: [1400, 1100, 950, 820, 700, 600] },
-      { id: "L", label: "Lサイズ（長辺35cmまで）", maxMm: 350, fee: [1900, 1500, 1250, 1080, 920, 800] },
+      { id: "L", label: "Lサイズ（長辺40cmまで）", maxMm: 400, fee: [1900, 1500, 1250, 1080, 920, 800] },
     ],
   },
 };

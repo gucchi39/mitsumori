@@ -17,6 +17,9 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 [hidden] { display: none !important; }
+/* ページ全体は縦1画面に固定し、中央の main だけをスクロールさせる。
+ * これによりヘッダーと概算バーは常に画面内に固定される
+ * （sticky では包含ブロックの都合でスクロール追従できなかった）。 */
 html, body { height: 100%; }
 body {
   font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", sans-serif;
@@ -24,7 +27,9 @@ body {
   background: var(--bg);
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 button { font-family: inherit; cursor: pointer; }
 input, select, textarea { font-family: inherit; font-size: 14px; }
@@ -33,7 +38,7 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .topbar {
   display: flex; align-items: center; gap: 24px;
   background: #fff; border-bottom: 1px solid var(--line);
-  padding: 10px 20px; position: sticky; top: 0; z-index: 50;
+  padding: 10px 20px; z-index: 50; flex: 0 0 auto;
 }
 .brand { display: flex; flex-direction: column; line-height: 1.2; }
 .brand-name { font-weight: 900; font-size: 18px; color: var(--accent); letter-spacing: 0.02em; }
@@ -72,9 +77,11 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
 .primary-btn.small, .ghost-btn.small { padding: 7px 14px; font-size: 12px; }
 
 /* ---------------- ステップ表示 ---------------- */
-main { flex: 1; }
+main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .step { display: none; }
 .step.active { display: block; }
+/* STEP2（エディタ）は main の高さいっぱいに広げ、内部の各パネルで個別スクロール */
+#step2.active { height: 100%; }
 
 /* ---------------- STEP1 商品選択 ---------------- */
 .step1-inner { max-width: 1080px; margin: 0 auto; padding: 36px 20px 60px; }
@@ -107,7 +114,7 @@ main { flex: 1; }
   display: grid;
   grid-template-columns: 74px 264px 1fr 240px;
   gap: 0;
-  height: calc(100vh - 60px - 64px);
+  height: 100%;
   min-height: 540px;
 }
 .toolrail {
@@ -290,7 +297,7 @@ main { flex: 1; }
 
 /* ---------------- 概算バー ---------------- */
 .estimate-bar {
-  position: sticky; bottom: 0; z-index: 50;
+  flex: 0 0 auto; z-index: 50;
   background: #fff; border-top: 2px solid var(--line);
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 22px; gap: 16px;
