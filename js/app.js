@@ -13,7 +13,7 @@
     tab: "color",
     quantities: {},
     lastQuote: null,
-    textDefaults: { text: "サンプル", fontId: "gothic", fontSize: 40, fill: "#111111", stroke: "#ffffff", strokeWidth: 0, letterSpacing: 0, arch: 0 },
+    textDefaults: { text: "サンプル", fontId: "gothic", fontSize: 40, fill: "#111111", stroke: "#ffffff", strokeWidth: 0, letterSpacing: 0, arch: 0, vertical: false },
     stampFill: "#111111",
   };
 
@@ -32,7 +32,10 @@
     });
 
     bindGlobalEvents();
-    checkAutosave();
+    /* 共有URL（#d=…）があれば最優先で復元、なければ自動保存の復元案内 */
+    applyShareHash().then((loaded) => {
+      if (!loaded) checkAutosave();
+    });
     updateNav();
   }
 
@@ -61,12 +64,23 @@
     $("#btnGrid").addEventListener("click", (e) => e.currentTarget.classList.toggle("on", Editor.toggleGrid()));
     $("#btnPreview").addEventListener("click", (e) => e.currentTarget.classList.toggle("on", Editor.togglePreview()));
 
-    /* 保存・読込 */
+    /* 選択オブジェクトの操作バー */
+    $("#saDup").addEventListener("click", () => Editor.duplicateSelected());
+    $("#saCenter").addEventListener("click", () => Editor.centerSelected("both"));
+    $("#saFlip").addEventListener("click", () => Editor.flipSelected());
+
+    /* 保存・読込・共有・新規 */
     $("#btnSave").addEventListener("click", downloadJSON);
     $("#fileLoad").addEventListener("change", (e) => {
       const f = e.target.files[0];
       if (f) loadJSONFile(f);
       e.target.value = "";
+    });
+    $("#btnShare").addEventListener("click", shareDesign);
+    $("#btnNew").addEventListener("click", () => {
+      if (hasAnyDesign() && !confirm("現在のデザインを破棄して最初からやり直しますか？")) return;
+      localStorage.removeItem(AUTOSAVE_KEY);
+      location.href = location.pathname; /* ハッシュも消してリロード */
     });
 
     /* STEP3 */
@@ -238,7 +252,8 @@
           <span class="tp-label">文字間隔</span>
           <div class="range-row"><input type="range" id="tpSpacing" min="-5" max="40" value="${t.letterSpacing}"><output>${t.letterSpacing}</output></div>
           <span class="tp-label">アーチ変形（上ぞり・下ぞり）</span>
-          <div class="range-row"><input type="range" id="tpArch" min="-100" max="100" value="${t.arch}"><output>${t.arch}</output></div>
+          <div class="range-row"><input type="range" id="tpArch" min="-100" max="100" value="${t.arch}" ${t.vertical ? "disabled" : ""}><output>${t.arch}</output></div>
+          <label class="check-row"><input type="checkbox" id="tpVertical" ${t.vertical ? "checked" : ""}> 縦書きにする（名入れ向け）</label>
           ${editing ? "" : `<button class="primary-btn small" id="tpAdd" style="margin-top:12px;width:100%">＋ テキストを追加</button>`}
         </div>`;
       bindTextPanel(editing);
@@ -267,6 +282,29 @@
           const s = Editor.selectedObj();
           if (s && s.type === "stamp") Editor.updateSelected({ fill: b.dataset.sfill });
           renderToolPanel();
+        })
+      );
+
+    } else if (app.tab === "template") {
+      panel.innerHTML = `
+        <h3>デザインテンプレート</h3>
+        <div class="tp-section">
+          <p class="upload-note" style="margin:0 0 10px">クリックで現在のプリント位置（${(p.printAreas.find((a) => a.id === Editor.state.areaId) || {}).name || ""}）に配置。文字はあとから自由に書き換えできます。</p>
+          <div class="template-grid">
+            ${Templates.TEMPLATES.map((t) => `
+              <button class="template-card" data-tpl="${t.id}">
+                ${Editor.templateThumbSVG(t)}
+                <span class="tc-name">${t.name}</span>
+                <span class="tc-tag">${t.tag}</span>
+              </button>`).join("")}
+          </div>
+        </div>`;
+      panel.querySelectorAll("[data-tpl]").forEach((b) =>
+        b.addEventListener("click", () => {
+          const d = Editor.designFor(Editor.state.areaId);
+          if (d.objects.length && !confirm("このプリント位置のデザインをテンプレートで置き換えます。よろしいですか？")) return;
+          Editor.applyTemplate(Templates.getTemplate(b.dataset.tpl));
+          toast("テンプレートを配置しました。文字はクリックして書き換えできます");
         })
       );
 
@@ -326,6 +364,7 @@
       strokeWidth: Number($("#tpStrokeW").value),
       letterSpacing: Number($("#tpSpacing").value),
       arch: Number($("#tpArch").value),
+      vertical: $("#tpVertical").checked,
     });
     const applyLive = (commitNow) => {
       const props = get();
@@ -333,8 +372,9 @@
       const sel = Editor.selectedObj();
       if (sel && sel.type === "text") Editor.updateSelected(props, commitNow);
       $("#tpStrokeColors").hidden = props.strokeWidth <= 0;
+      $("#tpArch").disabled = props.vertical;
     };
-    ["tpText", "tpFont", "tpSize", "tpStrokeW", "tpSpacing", "tpArch"].forEach((id) => {
+    ["tpText", "tpFont", "tpSize", "tpStrokeW", "tpSpacing", "tpArch", "tpVertical"].forEach((id) => {
       const el = document.getElementById(id);
       el.addEventListener("input", (e) => {
         applyLive(false);
@@ -510,6 +550,10 @@
 
   function onEditorSelect(obj) {
     renderLayerList();
+    /* 選択オブジェクト用の操作バー */
+    const bar = $("#selActions");
+    bar.hidden = !obj;
+    if (obj) $("#saFlip").disabled = obj.type === "text";
     if (obj) {
       if (obj.type === "text" && app.tab !== "text") setTab("text");
       else if (obj.type === "stamp" && app.tab !== "stamp") setTab("stamp");
@@ -751,6 +795,87 @@
       .catch(() => alert("PNGの生成に失敗しました。SVG形式をお試しください。"));
   }
 
+  /* ================= 共有URL =================
+   * デザインを deflate 圧縮 + base64url にして URL ハッシュに埋め込みます。
+   * サーバー不要でお客様にそのままリンクを送れます（画像は含まれません）。 */
+
+  function b64urlEncode(bytes) {
+    let s = "";
+    bytes.forEach((b) => (s += String.fromCharCode(b)));
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64urlDecode(str) {
+    const bin = atob(str.replace(/-/g, "+").replace(/_/g, "/"));
+    return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+  }
+  async function deflate(str) {
+    const stream = new Blob([new TextEncoder().encode(str)]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  }
+  async function inflate(bytes) {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return new TextDecoder().decode(await new Response(stream).arrayBuffer());
+  }
+
+  async function buildShareURL() {
+    const data = Editor.serialize();
+    let removed = 0;
+    const designs = {};
+    for (const [k, d] of Object.entries(data.designs || {})) {
+      const objs = (d.objects || []).filter((o) => o.type !== "image");
+      removed += (d.objects || []).length - objs.length;
+      designs[k] = { methodId: d.methodId, objects: objs };
+    }
+    const payload = JSON.stringify({ ...data, designs, q: app.quantities });
+    let url;
+    if (typeof CompressionStream !== "undefined") {
+      url = location.origin + location.pathname + "#d=" + b64urlEncode(await deflate(payload));
+    } else {
+      url = location.origin + location.pathname + "#D=" + b64urlEncode(new TextEncoder().encode(payload));
+    }
+    return { url, removed };
+  }
+
+  async function shareDesign() {
+    if (!Editor.state.product) {
+      toast("先に商品を選んでデザインを作成してください", "warn");
+      return;
+    }
+    try {
+      const { url, removed } = await buildShareURL();
+      await navigator.clipboard.writeText(url);
+      toast("共有リンクをコピーしました📋" + (removed ? `（画像${removed}点はリンクに含まれません）` : ""));
+    } catch (e) {
+      try {
+        const { url } = await buildShareURL();
+        prompt("このURLをコピーして共有してください", url);
+      } catch (e2) {
+        toast("共有リンクを作成できませんでした", "warn");
+      }
+    }
+  }
+
+  async function applyShareHash() {
+    const h = location.hash || "";
+    if (!h.startsWith("#d=") && !h.startsWith("#D=")) return false;
+    try {
+      const raw = h.slice(3);
+      const json = h[1] === "d"
+        ? await inflate(b64urlDecode(raw))
+        : new TextDecoder().decode(b64urlDecode(raw));
+      const data = JSON.parse(json);
+      if (!Editor.load(data)) return false;
+      app.quantities = data.q || {};
+      goStep(2);
+      renderEditorPanels();
+      toast("共有されたデザインを読み込みました");
+      return true;
+    } catch (e) {
+      console.warn("share hash decode failed", e);
+      return false;
+    }
+  }
+
   /* ================= 自動保存 ================= */
 
   const autosave = debounce(() => {
@@ -785,6 +910,21 @@
   }
 
   /* ================= 小物 ================= */
+
+  /** 画面右下の通知トースト */
+  function toast(msg, type = "ok") {
+    const box = $("#toastBox");
+    if (!box) return;
+    const el = document.createElement("div");
+    el.className = "toast " + type;
+    el.textContent = msg;
+    box.appendChild(el);
+    requestAnimationFrame(() => el.classList.add("show"));
+    setTimeout(() => {
+      el.classList.remove("show");
+      setTimeout(() => el.remove(), 350);
+    }, 3200);
+  }
 
   function escapeHtml(s) {
     return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");

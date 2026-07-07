@@ -135,6 +135,16 @@
     const arch = Number(obj.arch) || 0;
     const { w, lines } = measureText(obj);
 
+    /* 縦書き（1行 = 1列、右から左へ） */
+    if (obj.vertical) {
+      const lh = obj.fontSize * 1.15;
+      const n = lines.length;
+      return lines.map((line, i) =>
+        `<text ${common} x="${((n - 1) / 2 - i) * lh}" y="0" text-anchor="middle" dominant-baseline="central"` +
+        ` style="writing-mode:vertical-rl;text-orientation:upright">${esc(line) || "　"}</text>`
+      ).join("");
+    }
+
     if (arch !== 0 && lines.length) {
       const textJoined = lines.join("　");
       const chord = Math.max(w, 20);
@@ -168,8 +178,9 @@
     if (obj.type === "text") inner = textMarkup(obj);
     else if (obj.type === "stamp") inner = stampMarkup(obj);
     else if (obj.type === "image") inner = imageMarkup(obj);
+    const flip = obj.flipX ? " scale(-1 1)" : "";
     return `<g class="obj${editable ? " editable" : ""}" data-id="${obj.id}"` +
-      ` transform="translate(${obj.x} ${obj.y}) rotate(${obj.rotation}) scale(${obj.scale})">` +
+      ` transform="translate(${obj.x} ${obj.y}) rotate(${obj.rotation}) scale(${obj.scale})${flip}">` +
       `<g class="obj-inner">${inner}</g></g>`;
   }
 
@@ -247,9 +258,18 @@
 
     const pad = 8 / obj.scale;
     const x = bb.x - pad, y = bb.y - pad, w = bb.width + pad * 2, h = bb.height + pad * 2;
-    const handleR = 11 / obj.scale; // 画面上でほぼ一定サイズに見えるように補正
+    /* タッチ端末では掴みやすいよう大きめに */
+    const baseR = matchMedia("(pointer: coarse)").matches ? 17 : 11;
+    const handleR = baseR / obj.scale;
 
-    layer.innerHTML = `<g transform="translate(${obj.x} ${obj.y}) rotate(${obj.rotation}) scale(${obj.scale})">
+    /* 中央スナップガイド（ドラッグ中のみ） */
+    const area = currentArea();
+    let guides = "";
+    if (drag && drag.mode === "move" && area) {
+      if (dragGuides.v) guides += `<line x1="${area.x + area.w / 2}" y1="${area.y - 24}" x2="${area.x + area.w / 2}" y2="${area.y + area.h + 24}" stroke="#ff6a13" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+      if (dragGuides.h) guides += `<line x1="${area.x - 24}" y1="${area.y + area.h / 2}" x2="${area.x + area.w + 24}" y2="${area.y + area.h / 2}" stroke="#ff6a13" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+    }
+    layer.innerHTML = guides + `<g transform="translate(${obj.x} ${obj.y}) rotate(${obj.rotation}) scale(${obj.scale})">
       <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#2d7ff9" stroke-width="${2 / obj.scale}" stroke-dasharray="${6 / obj.scale} ${4 / obj.scale}"/>
       <line x1="0" y1="${y}" x2="0" y2="${y - 26 / obj.scale}" stroke="#2d7ff9" stroke-width="${2 / obj.scale}"/>
       <circle data-handle="rotate" cx="0" cy="${y - 32 / obj.scale}" r="${handleR}" fill="#fff" stroke="#2d7ff9" stroke-width="${2 / obj.scale}" style="cursor:grab"/>
@@ -264,6 +284,7 @@
   /* ---------------- ポインタ操作 ---------------- */
 
   let drag = null; // { mode, startPt, obj, orig... }
+  const dragGuides = { v: false, h: false }; // 中央スナップの発動状態
 
   function onPointerDown(evt) {
     if (!state.product || state.preview) return;
@@ -324,6 +345,12 @@
       if (area) {
         nx = Math.max(area.x, Math.min(area.x + area.w, nx));
         ny = Math.max(area.y, Math.min(area.y + area.h, ny));
+        /* 中央に吸着 */
+        const acx = area.x + area.w / 2, acy = area.y + area.h / 2;
+        dragGuides.v = Math.abs(nx - acx) < 7;
+        dragGuides.h = Math.abs(ny - acy) < 7;
+        if (dragGuides.v) nx = acx;
+        if (dragGuides.h) ny = acy;
       }
       o.x = Math.round(nx * 10) / 10;
       o.y = Math.round(ny * 10) / 10;
@@ -343,12 +370,22 @@
   function onPointerUp() {
     if (!drag) return;
     drag = null;
+    dragGuides.v = dragGuides.h = false;
     commit();
     callbacks.onSelect(selectedObj());
   }
 
   function onKeyDown(evt) {
     if (["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)) return;
+
+    /* ショートカット（選択がなくても有効） */
+    if (evt.ctrlKey || evt.metaKey) {
+      const k = evt.key.toLowerCase();
+      if (k === "z" && !evt.shiftKey) { undo(); evt.preventDefault(); return; }
+      if ((k === "z" && evt.shiftKey) || k === "y") { redo(); evt.preventDefault(); return; }
+      if (k === "d") { duplicateSelected(); evt.preventDefault(); return; }
+    }
+
     const o = selectedObj();
     if (!o) return;
     const step = evt.shiftKey ? 10 : 2;
@@ -386,8 +423,13 @@
     const a = currentArea();
     if (a) {
       const { w, lines } = measureText(obj);
-      const h = obj.fontSize * 1.15 * Math.max(1, lines.length);
-      obj.scale = Math.min(1, (a.w * 0.85) / Math.max(w, 1), (a.h * 0.85) / h);
+      let dw = w, dh = obj.fontSize * 1.15 * Math.max(1, lines.length);
+      if (obj.vertical) {
+        const maxChars = Math.max(1, ...lines.map((l) => l.length));
+        dw = obj.fontSize * 1.15 * lines.length;
+        dh = obj.fontSize * 1.05 * maxChars;
+      }
+      obj.scale = Math.min(1, (a.w * 0.85) / Math.max(dw, 1), (a.h * 0.85) / Math.max(dh, 1));
     }
     design().objects.push(obj);
     state.selectedId = obj.id;
@@ -451,6 +493,41 @@
     state.selectedId = null;
     commit();
     callbacks.onSelect(null);
+  }
+
+  function duplicateSelected() {
+    const o = selectedObj();
+    if (!o) return;
+    const a = currentArea();
+    const copy = JSON.parse(JSON.stringify(o));
+    copy.id = uid();
+    copy.x += 16;
+    copy.y += 16;
+    if (a) {
+      copy.x = Math.min(copy.x, a.x + a.w);
+      copy.y = Math.min(copy.y, a.y + a.h);
+    }
+    design().objects.push(copy);
+    state.selectedId = copy.id;
+    commit();
+    callbacks.onSelect(copy);
+  }
+
+  /* axis: "h"=左右中央 / "v"=上下中央 / "both" */
+  function centerSelected(axis) {
+    const o = selectedObj();
+    const a = currentArea();
+    if (!o || !a) return;
+    if (axis === "h" || axis === "both") o.x = a.x + a.w / 2;
+    if (axis === "v" || axis === "both") o.y = a.y + a.h / 2;
+    commit();
+  }
+
+  function flipSelected() {
+    const o = selectedObj();
+    if (!o || o.type === "text") return;
+    o.flipX = !o.flipX;
+    commit();
   }
 
   function reorderSelected(dir) {
@@ -588,6 +665,59 @@
     return result;
   }
 
+  /* ---------------- テンプレート ---------------- */
+
+  /* テンプレート定義（100×100相対座標）を実座標のオブジェクト配列に変換 */
+  function mapTemplateObjects(tpl, a) {
+    return tpl.objects.map((t) => {
+      const base = {
+        id: uid(),
+        x: a.x + (t.tx / 100) * a.w,
+        y: a.y + (t.ty / 100) * a.h,
+        scale: 1,
+        rotation: t.rotation || 0,
+      };
+      if (t.type === "text") {
+        return Object.assign(base, {
+          type: "text",
+          text: t.text,
+          fontId: t.fontId || "gothic",
+          fontSize: Math.max(8, (t.size / 100) * a.w),
+          fill: t.fill || "#111111",
+          stroke: t.stroke || "#ffffff",
+          strokeWidth: t.strokeWidth || 0,
+          letterSpacing: t.letterSpacing || 0,
+          arch: t.arch || 0,
+          vertical: !!t.vertical,
+        });
+      }
+      return Object.assign(base, {
+        type: "stamp",
+        stampId: t.stampId,
+        fill: t.fill || "#111111",
+        scale: ((t.size / 100) * a.w) / 120,
+      });
+    });
+  }
+
+  /** テンプレートを現在のプリント位置に適用（既存デザインは置き換え） */
+  function applyTemplate(tpl) {
+    const a = currentArea();
+    if (!a || !tpl) return;
+    design().objects = mapTemplateObjects(tpl, a);
+    state.selectedId = null;
+    commit();
+    callbacks.onSelect(null);
+  }
+
+  /** テンプレート一覧用サムネイル */
+  function templateThumbSVG(tpl) {
+    const objs = mapTemplateObjects(tpl, { x: 0, y: 0, w: 100, h: 100 });
+    return `<svg viewBox="-5 -5 110 110" xmlns="http://www.w3.org/2000/svg">
+      <rect x="-5" y="-5" width="110" height="110" rx="6" fill="#ffffff"/>
+      ${objs.map((o) => objMarkup(o, false)).join("")}</svg>`;
+  }
+
   /* ---------------- サムネイル・エクスポート ---------------- */
 
   /** プリント位置選択用のミニサムネイルSVG */
@@ -699,6 +829,8 @@
 
     addText, addStamp, addImage,
     updateSelected, deleteSelected, reorderSelected, selectObject,
+    duplicateSelected, centerSelected, flipSelected,
+    applyTemplate, templateThumbSVG,
     undo, redo,
     getPlacements, areaThumbSVG, exportSVG, exportPNG,
 

@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Shippori+Mincho+B1:wght@600&family=Zen+Maru+Gothic:wght@700&family=Mochiy+Pop+One&family=Yuji+Syuku&family=Yomogi&family=Dela+Gothic+One&family=Anton&family=Playfair+Display:wght@600&family=Pacifico&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧵</text></svg>">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -23,6 +24,8 @@
     <li data-step="3"><span class="num">3</span>お見積もり</li>
   </ol>
   <div class="top-actions">
+    <button class="ghost-btn" id="btnNew" title="最初からやり直す">✚ 新規</button>
+    <button class="ghost-btn" id="btnShare" title="デザインをURLで共有">🔗 共有</button>
     <button class="ghost-btn" id="btnSave" title="デザインをファイルに保存">💾 保存</button>
     <label class="ghost-btn" title="保存したデザインを読み込み">📂 読込<input type="file" id="fileLoad" accept=".json" hidden></label>
   </div>
@@ -35,6 +38,12 @@
     <div class="step1-inner">
       <h1>商品を選んで、その場でデザイン＆お見積もり</h1>
       <p class="lead">Illustratorなどの専用ソフトは不要。テキスト・スタンプ・画像で誰でも簡単にデザインでき、刺繍・プリントの概算金額がすぐに分かります。</p>
+      <div class="flow-strip">
+        <span><b>1</b> 商品・カラーを選ぶ</span>
+        <span><b>2</b> テンプレや文字でデザイン</span>
+        <span><b>3</b> 枚数を入れて自動見積もり</span>
+        <span><b>4</b> 見積書印刷・リンク共有</span>
+      </div>
       <div id="restoreBanner" class="restore-banner" hidden>
         <span>前回作成中のデザインがあります。</span>
         <button class="primary-btn small" id="btnRestore">続きから再開する</button>
@@ -50,6 +59,7 @@
 
       <nav class="toolrail" id="toolrail">
         <button data-tab="color" class="active"><span class="tr-icon">👕</span>カラー</button>
+        <button data-tab="template"><span class="tr-icon">📐</span>テンプレ</button>
         <button data-tab="text"><span class="tr-icon">Ｔ</span>テキスト</button>
         <button data-tab="stamp"><span class="tr-icon">★</span>スタンプ</button>
         <button data-tab="image"><span class="tr-icon">⬆</span>画像</button>
@@ -72,6 +82,11 @@
           <div class="ct-group">
             <button id="btnGrid" title="グリッド表示">⊞ グリッド</button>
             <button id="btnPreview" title="仕上がりプレビュー">👁 仕上がり</button>
+          </div>
+          <div class="ct-group sel-actions" id="selActions" hidden>
+            <button id="saDup" title="複製（Ctrl+D）">⧉ 複製</button>
+            <button id="saCenter" title="プリント範囲の中央に配置">◎ 中央</button>
+            <button id="saFlip" title="左右反転（スタンプ・画像）">⇋ 反転</button>
           </div>
         </div>
         <div class="canvas-wrap" id="canvasWrap">
@@ -143,10 +158,13 @@
 <!-- ============ 見積書（印刷用） ============ -->
 <div id="quoteSheet" class="quote-sheet" aria-hidden="true"></div>
 
+<div id="toastBox" class="toast-box" aria-live="polite"></div>
+
 <script src="js/config.js"></script>
 <script src="js/quote.js"></script>
 <script src="js/mockups.js"></script>
 <script src="js/stamps.js"></script>
+<script src="js/templates.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/app.js"></script>
 </body>
