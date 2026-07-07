@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>使い方マニュアル｜ミツモリ デザインシミュレーター</title>
+<meta name="description" content="オリジナルウェア デザインシミュレーターの使い方（お客様向け）と設定・運用（店舗向け）のマニュアル。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+<style>
+  :root{
+    --accent:#ff6a13; --accent-dark:#e05a08;
+    --ink:#232a35; --sub:#6b7686; --line:#e2e6ee; --bg:#f4f6f9; --panel:#fff;
+    --box:#fff8f2; --box-line:#ffd9b8; --shadow:0 2px 12px rgba(25,35,55,.08);
+    --radius:12px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{ --ink:#e9edf3; --sub:#9aa4b2; --line:#2c3440; --bg:#161a21; --panel:#1e232c;
+           --box:#2a2016; --box-line:#5a3d1f; --shadow:0 2px 12px rgba(0,0,0,.3); }
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+    color:var(--ink); background:var(--bg); line-height:1.75;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:0 20px}
+
+  /* ヘッダー */
+  header.top{
+    background:linear-gradient(135deg,var(--accent),#ff8f4d);
+    color:#fff;padding:38px 0 30px;
+  }
+  header.top .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:14px;justify-content:space-between}
+  header.top h1{font-size:26px;font-weight:900;letter-spacing:.02em}
+  header.top p{font-size:13px;opacity:.92;margin-top:4px}
+  .app-link{
+    background:#fff;color:var(--accent-dark);text-decoration:none;font-weight:700;font-size:14px;
+    padding:11px 20px;border-radius:999px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.18);
+    transition:transform .12s;
+  }
+  .app-link:hover{transform:translateY(-2px)}
+
+  /* 目次 */
+  nav.toc{
+    background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:16px 20px;margin:26px 0;
+  }
+  nav.toc h2{font-size:12px;color:var(--sub);letter-spacing:.08em;margin-bottom:10px}
+  nav.toc ol{list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:6px 20px}
+  nav.toc a{color:var(--ink);text-decoration:none;font-size:14px;font-weight:600;
+    display:flex;gap:8px;align-items:baseline;padding:3px 0}
+  nav.toc a:hover{color:var(--accent-dark)}
+  nav.toc a .n{color:var(--accent);font-weight:800;min-width:20px}
+
+  main{padding:8px 0 60px}
+  section{margin:38px 0;scroll-margin-top:20px}
+  .part-label{
+    display:inline-block;background:var(--accent);color:#fff;font-size:12px;font-weight:800;
+    padding:4px 12px;border-radius:999px;letter-spacing:.04em;margin-bottom:10px;
+  }
+  h2.sec{font-size:22px;font-weight:800;border-bottom:2px solid var(--line);padding-bottom:10px;margin-bottom:8px}
+  h3{font-size:16px;font-weight:800;margin:22px 0 8px;display:flex;align-items:center;gap:8px}
+  p{margin:8px 0}
+  .lead{color:var(--sub);font-size:15px}
+
+  /* ステップカード */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:16px}
+  .step .num{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;
+    font-weight:800;display:flex;align-items:center;justify-content:center;margin-bottom:8px}
+  .step h4{font-size:15px;font-weight:800;margin-bottom:4px}
+  .step p{font-size:13px;color:var(--sub);margin:0}
+
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px;
+    background:var(--panel);border-radius:10px;overflow:hidden;box-shadow:var(--shadow)}
+  th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:rgba(255,106,19,.08);font-weight:700;font-size:13px;color:var(--accent-dark);white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td strong{color:var(--ink)}
+  .tbl-scroll{overflow-x:auto}
+
+  ul.clean{list-style:none;margin:10px 0}
+  ul.clean li{position:relative;padding-left:22px;margin:6px 0;font-size:14.5px}
+  ul.clean li::before{content:"▸";position:absolute;left:2px;color:var(--accent);font-weight:800}
+
+  .callout{background:var(--box);border:1px solid var(--box-line);border-radius:10px;
+    padding:13px 16px;margin:16px 0;font-size:14px}
+  .callout.warn{--box:#fff6e6;--box-line:#f0d18a}
+  @media (prefers-color-scheme:dark){.callout.warn{--box:#33280f;--box-line:#6b5220}}
+  .callout b{color:var(--accent-dark)}
+  .callout .ico{font-weight:800;margin-right:6px}
+
+  .method-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0}
+  .mc{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;box-shadow:var(--shadow)}
+  .mc .mc-ico{font-size:26px}
+  .mc h4{font-size:14px;font-weight:800;margin:6px 0 4px}
+  .mc p{font-size:12.5px;color:var(--sub);margin:0}
+
+  code,.code{font-family:"SFMono-Regular",Consolas,"Courier New",monospace;
+    background:rgba(127,127,127,.14);padding:1px 6px;border-radius:5px;font-size:.9em}
+  pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+    overflow-x:auto;font-size:13px;margin:12px 0;box-shadow:var(--shadow)}
+  pre code{background:none;padding:0}
+
+  .divider{height:1px;background:var(--line);margin:40px 0;border:none}
+
+  footer{color:var(--sub);font-size:13px;text-align:center;padding:26px 0 44px;border-top:1px solid var(--line)}
+
+  @media (max-width:680px){
+    .steps,.method-cards{grid-template-columns:1fr}
+    nav.toc ol{grid-template-columns:1fr}
+    header.top h1{font-size:22px}
+  }
+  @media print{
+    header.top{background:none;color:#000;border-bottom:2px solid #000}
+    .app-link,nav.toc{display:none}
+    body{background:#fff}
+    .step,.mc,table,pre{box-shadow:none}
+    section{page-break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div>
+      <h1>📖 使い方マニュアル</h1>
+      <p>ミツモリ デザインシミュレーター ／ オリジナルウェア自動見積もり</p>
+    </div>
+    <a class="app-link" href="../index.html">シミュレーターを開く →</a>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc">
+    <h2>もくじ</h2>
+    <ol>
+      <li><a href="#s1"><span class="n">1</span>お客様向け：使い方の流れ</a></li>
+      <li><a href="#s2"><span class="n">2</span>デザインの操作</a></li>
+      <li><a href="#s3"><span class="n">3</span>加工方法の選び方</a></li>
+      <li><a href="#s4"><span class="n">4</span>保存・共有・注文</a></li>
+      <li><a href="#s5"><span class="n">5</span>運営：価格・商品の変更</a></li>
+      <li><a href="#s6"><span class="n">6</span>運営：注文の受取・公開・運用</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+    <!-- ============ 第1部 ============ -->
+    <section id="s1">
+      <span class="part-label">第1部　お客様向け</span>
+      <h2 class="sec">使い方の流れ（3ステップ）</h2>
+      <p class="lead">Illustratorなどの専用ソフトは不要。誰でもWeb上で簡単にデザインでき、その場で概算金額が分かります。画面下の帯には、いつでも <b>概算合計金額</b> が表示されます。</p>
+
+      <div class="steps">
+        <div class="step">
+          <div class="num">1</div>
+          <h4>商品を選ぶ</h4>
+          <p>Tシャツ・ポロ・パーカー・キャップ・トート・タオルなどから選択。参考価格・対応加工・カラー数が一覧で分かります。</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <h4>デザインする</h4>
+          <p>本体カラーを選び、テンプレ・文字・スタンプ・画像を配置。プリント位置ごとに加工方法も選べます。</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <h4>お見積もり</h4>
+          <p>サイズごとの枚数を入力すると、明細つきの金額が自動計算。見積書の印刷・注文まで進めます。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="s2">
+      <h2 class="sec">デザインの操作</h2>
+      <h3>🧰 左メニューの道具</h3>
+      <div class="tbl-scroll">
+      <table>
+        <tr><th>メニュー</th><th>できること</th></tr>
+        <tr><td><strong>👕 カラー</strong></td><td>商品本体の色を変える／商品を変更する</td></tr>
+        <tr><td><strong>📐 テンプレ</strong></td><td>定番デザイン（チームロゴ・クラスT・名入れ 等）をワンクリックで配置。文字は後から書き換え可</td></tr>
+        <tr><td><strong>Ｔ テキスト</strong></td><td>文字を追加。書体・色・フチ取り・文字間隔・<strong>アーチ変形</strong>・<strong>縦書き</strong>（名入れ向け）</td></tr>
+        <tr><td><strong>★ スタンプ</strong></td><td>内蔵イラストを配置。色は自由に変更可</td></tr>
+        <tr><td><strong>⬆ 画像</strong></td><td>画像（JPG/PNG/GIF/WebP）をアップロード。解像度が低いと警告が出ます</td></tr>
+        <tr><td><strong>🧵 加工方法</strong></td><td>プリント位置ごとに「刺繍／シルクスクリーン／フルカラー」を選択</td></tr>
+      </table>
+      </div>
+
+      <h3>✋ 操作のコツ</h3>
+      <ul class="clean">
+        <li><strong>移動</strong>：ドラッグ。中央に近づくとガイド線が出て吸着します。</li>
+        <li><strong>拡大・縮小／回転</strong>：選ぶと出る青い枠の角（□）で拡縮、上の丸（○）で回転。</li>
+        <li><strong>微調整</strong>：選択中に矢印キーで移動（Shift＋矢印で大きく）。</li>
+        <li><strong>複製 / 中央 / 反転</strong>：上部ツールバーのボタン（選択中に表示）。</li>
+        <li><strong>重ね順</strong>：右の「重ね順（レイヤー）」で前後入替・削除。</li>
+        <li><strong>もどる／やり直す</strong>：上部ツールバー、または Ctrl+Z / Ctrl+Y。</li>
+        <li><strong>仕上がりプレビュー</strong>：枠線を消して完成イメージを確認。</li>
+        <li><strong>プリント位置</strong>：画面下のサムネイル（前面・背面・左胸・袖 等）で切替。位置ごとに別デザイン・別加工が可能。</li>
+      </ul>
+    </section>
+
+    <section id="s3">
+      <h2 class="sec">加工方法の選び方</h2>
+      <div class="method-cards">
+        <div class="mc">
+          <div class="mc-ico">🧵</div>
+          <h4>刺繍</h4>
+          <p>ロゴ・ネーム入れ向け。糸色パレットから選択（最大6色）。写真は不可。高級感が出ます。</p>
+        </div>
+        <div class="mc">
+          <div class="mc-ico">🖨</div>
+          <h4>シルクスクリーン</h4>
+          <p>1〜4色のデザイン向け。枚数が多いほど1枚が割安。版代がかかります。</p>
+        </div>
+        <div class="mc">
+          <div class="mc-ico">🎨</div>
+          <h4>フルカラー</h4>
+          <p>写真・グラデもそのまま。版代なし・1枚から。インクジェット。</p>
+        </div>
+      </div>
+      <div class="callout">
+        <span class="ico">💡</span>プリント位置ごとに加工方法を変えられます（例：前面はフルカラー、左胸は刺繍）。色数・サイズ・数量から自動でお見積もりします。
+      </div>
+    </section>
+
+    <section id="s4">
+      <h2 class="sec">保存・共有・注文</h2>
+      <div class="tbl-scroll">
+      <table>
+        <tr><th>ボタン</th><th>内容</th></tr>
+        <tr><td><strong>🔗 共有</strong></td><td>今のデザインをURL化してコピー。相手に送ると同じデザイン・見積もりが再現されます（サーバー不要。※画像は含まれません）</td></tr>
+        <tr><td><strong>💾 保存</strong></td><td>デザインをファイル（.json）に保存</td></tr>
+        <tr><td><strong>📂 読込</strong></td><td>保存したファイルを読み込み</td></tr>
+        <tr><td><strong>✚ 新規</strong></td><td>最初からやり直す</td></tr>
+        <tr><td><strong>🖨 見積書を印刷</strong></td><td>宛名・金額入りの御見積書を印刷／PDF保存</td></tr>
+        <tr><td><strong>✉ 注文・問い合わせ</strong></td><td>注文内容を本文にしたメールを作成</td></tr>
+        <tr><td><strong>PNG / SVG / データ</strong></td><td>画像・ベクター（入稿用）・デザインデータで書き出し</td></tr>
+      </table>
+      </div>
+      <div class="callout">
+        <span class="ico">🔄</span>作成中のデザインは<strong>自動保存</strong>され、次に開いたとき「続きから再開」できます。
+      </div>
+    </section>
+
+    <hr class="divider">
+
+    <!-- ============ 第2部 ============ -->
+    <section id="s5">
+      <span class="part-label">第2部　運営（店舗）向け</span>
+      <h2 class="sec">価格・商品の変更</h2>
+      <p class="lead">このサービスは <strong>ビルド不要の静的サイト</strong> です。設定ファイル <code>js/config.js</code> を書き換えるだけで、画面・見積もり・見積書すべてに反映されます。</p>
+      <div class="tbl-scroll">
+      <table>
+        <tr><th>変更したいもの</th><th>場所（js/config.js 内）</th></tr>
+        <tr><td>会社名・住所・TEL・メール</td><td><code>SHOP</code></td></tr>
+        <tr><td>消費税率・<strong>端数処理</strong>・送料・送料無料ライン</td><td><code>SHOP</code>（taxRate / taxRounding / shippingFee / freeShippingMin）</td></tr>
+        <tr><td>数量による段階割引</td><td><code>QTY_TIERS</code></td></tr>
+        <tr><td>商品（名前・単価・サイズ・カラー・プリント位置・対応加工）</td><td><code>PRODUCTS</code></td></tr>
+        <tr><td>加工賃・版代/型代・色数上限</td><td><code>METHODS</code></td></tr>
+        <tr><td>刺繍糸の色 / インクの色</td><td><code>THREAD_COLORS</code> / <code>INK_COLORS</code></td></tr>
+        <tr><td>フォント</td><td><code>FONTS</code></td></tr>
+      </table>
+      </div>
+      <div class="callout warn">
+        <span class="ico">⚠️</span>現在の価格・商品は<b>サンプル値</b>です。公開前に必ず貴社の価格表に書き換えてください。
+      </div>
+    </section>
+
+    <section id="s6">
+      <h2 class="sec">注文の受取・公開・運用</h2>
+
+      <h3>📨 注文データの受け取り（現状）</h3>
+      <p>「✉ 注文・問い合わせ」ボタンで、注文内容を本文にしたメールが作成されます。お客様には、デザインデータ（💾 保存した .json ファイル）を添付して送っていただく運用です。</p>
+      <div class="callout">
+        <span class="ico">🚧</span>より確実に注文データを受け取る仕組み（フォーム自動受信・入稿データの品質向上）は現在改善を進めています。
+      </div>
+
+      <h3>🚀 公開・更新</h3>
+      <ul class="clean">
+        <li>GitHub Pages で自動公開済み。指定ブランチにプッシュすると数分で公開URLに反映されます。</li>
+        <li>レンタルサーバー等にフォルダごとアップロードしても動作します。</li>
+      </ul>
+
+      <h3>🧪 動作確認（開発者向け）</h3>
+      <p>見積もり計算のテストがあります。</p>
+      <pre><code>node --test tests/quote.test.js</code></pre>
+
+      <h3>🆘 困ったときは</h3>
+      <ul class="clean">
+        <li><strong>価格がおかしい</strong> → <code>js/config.js</code> の価格表と税率・送料を確認。</li>
+        <li><strong>商品を追加したい</strong> → <code>PRODUCTS</code> に1件追加（既存をコピーして書き換えるのが簡単）。</li>
+        <li><strong>画面が崩れる／動かない</strong> → ブラウザを最新版に更新。</li>
+      </ul>
+    </section>
+
+  </main>
+</div>
+
+<footer>
+  <div class="wrap">
+    ミツモリ デザインシミュレーター 操作マニュアル（概要版）<br>
+    お客様配布用の1枚チラシ版・スタッフ向け詳細手順も作成できます。
+  </div>
+</footer>
+
+</body>
+</html>
