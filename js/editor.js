@@ -248,7 +248,9 @@
   function imageMarkup(obj) {
     const href = safeHref(obj.href);
     if (!href) return "";
-    return `<image href="${esc(href)}" x="${-n(obj.w) / 2}" y="${-n(obj.h) / 2}" width="${n(obj.w)}" height="${n(obj.h)}" preserveAspectRatio="xMidYMid meet"/>`;
+    const e = esc(href);
+    /* href(SVG2)と xlink:href(旧Illustrator互換) を両方付与し画像欠落を防ぐ */
+    return `<image href="${e}" xlink:href="${e}" x="${-n(obj.w) / 2}" y="${-n(obj.h) / 2}" width="${n(obj.w)}" height="${n(obj.h)}" preserveAspectRatio="xMidYMid meet"/>`;
   }
 
   function objMarkup(obj, editable) {
@@ -730,7 +732,9 @@
       let hasImage = false;
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       let lowRes = false;
-      let visibleCount = 0; // プリント範囲に少しでも掛かるオブジェクト数
+      let minImageDpi = Infinity;
+      let minTextMm = Infinity;   // 最小の文字高さ(mm)。刺繍の潰れ判定に使う
+      let visibleCount = 0;       // プリント範囲に少しでも掛かるオブジェクト数
       const pxPerMm = a.w / a.mmW;
       const ax2 = a.x + a.w, ay2 = a.y + a.h;
 
@@ -748,10 +752,15 @@
           hasImage = true;
           const dispW = (o.w * o.scale) / pxPerMm; // mm
           const dpi = o.natW / (dispW / 25.4);
+          minImageDpi = Math.min(minImageDpi, dpi);
           if (dpi < 100) lowRes = true;
         } else {
           if (o.fill) colors.add(String(o.fill).toLowerCase());
           if (o.type === "text" && o.strokeWidth > 0 && o.stroke) colors.add(String(o.stroke).toLowerCase());
+          if (o.type === "text") {
+            const hMm = (bb.h) / pxPerMm; // 文字全体の高さ。単純化のため行高で近似
+            minTextMm = Math.min(minTextMm, hMm);
+          }
         }
         /* 範囲でクリップした矩形だけを実寸の union に含める */
         minX = Math.min(minX, ix1); minY = Math.min(minY, iy1);
@@ -766,12 +775,16 @@
       result.push({
         areaId: a.id,
         areaName: a.name,
+        view: a.view,
         methodId: d.methodId,
         colorCount: hasImage ? Math.max(colors.size, 1) : colors.size,
+        usedColors: Array.from(colors),   // 使用色(小文字hex)。指示書で色名/コードへ逆引き
         widthMm: wMm,
         heightMm: hMm,
         hasImage,
         lowRes,
+        minImageDpi: minImageDpi === Infinity ? null : minImageDpi,
+        minTextMm: minTextMm === Infinity ? null : minTextMm,
         objectCount: visibleCount,
       });
     }
@@ -859,6 +872,64 @@
       if (d && d.objects.length && !views.includes(a.view)) views.push(a.view);
     }
     return views;
+  }
+
+  /** デザインが存在するプリント位置のID配列（商品順） */
+  function designAreas() {
+    if (!state.product) return [];
+    return state.product.printAreas
+      .filter((a) => { const d = state.designs[a.id]; return d && d.objects.length; })
+      .map((a) => a.id);
+  }
+
+  /** 入稿用SVG：商品イラスト・白背景を含まず、指定プリント位置のアートワークのみを
+   *  実寸(mm)・原寸viewBoxで書き出す。Illustratorでそのまま原寸配置できる。 */
+  function exportProductionSVG(areaId) {
+    const a = state.product.printAreas.find((x) => x.id === areaId);
+    const d = state.designs[areaId];
+    if (!a || !d || !d.objects.length) return "";
+    const cid = "cut";
+    const fontStyle = FONT_IMPORT_URL ? `<style type="text/css">@import url("${FONT_IMPORT_URL}");</style>` : "";
+    const body = d.objects.map((o) => objMarkup(o, false)).join("");
+    /* 背景は透過（白ベタを入れない＝濃色ボディに白い四角が刷られない）。
+     * viewBox はプリント範囲そのもの、width/height は実寸mm。 */
+    return `<?xml version="1.0" encoding="UTF-8"?>\n` +
+      `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ` +
+      `width="${a.mmW}mm" height="${a.mmH}mm" viewBox="${a.x} ${a.y} ${a.w} ${a.h}">` +
+      `<defs>${fontStyle}<clipPath id="${cid}"><rect x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}"/></clipPath></defs>` +
+      `<g clip-path="url(#${cid})">${body}</g></svg>`;
+  }
+
+  /** 入稿用PNG（透過・高解像度）を指定位置ぶん生成 */
+  function exportProductionPNG(areaId, targetDpi) {
+    return new Promise((resolve, reject) => {
+      const a = state.product.printAreas.find((x) => x.id === areaId);
+      if (!a) return reject(new Error("area not found"));
+      const markup = exportProductionSVG(areaId);
+      if (!markup) return reject(new Error("empty"));
+      const blob = new Blob([markup], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        const dpi = targetDpi || 200;
+        const pxW = Math.round((a.mmW / 25.4) * dpi);
+        const pxH = Math.round((a.mmH / 25.4) * dpi);
+        const canvas = document.createElement("canvas");
+        canvas.width = pxW; canvas.height = pxH;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, pxW, pxH); // 背景透過のまま
+        URL.revokeObjectURL(url);
+        canvas.toBlob((png) => (png ? resolve(png) : reject(new Error("png"))), "image/png");
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("svg draw")); };
+      img.src = url;
+    });
+  }
+
+  /** プリント位置のメタ情報（指示書用） */
+  function areaMeta(areaId) {
+    const a = state.product ? state.product.printAreas.find((x) => x.id === areaId) : null;
+    return a ? { id: a.id, name: a.name, view: a.view, mmW: a.mmW, mmH: a.mmH } : null;
   }
 
   /** 指定ビュー（省略時は現在ビュー）をスタンドアロンSVG文字列として書き出し */
@@ -981,6 +1052,7 @@
     applyTemplate, templateThumbSVG,
     undo, redo,
     getPlacements, areaThumbSVG, exportSVG, exportPNG, designViews,
+    designAreas, exportProductionSVG, exportProductionPNG, areaMeta,
 
     get state() { return state; },
     selectedObj,

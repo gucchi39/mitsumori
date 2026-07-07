@@ -30,6 +30,7 @@
     lastQuote: null,
     textDefaults: { text: "サンプル", fontId: "gothic", fontSize: 40, fill: "#111111", stroke: "#ffffff", strokeWidth: 0, letterSpacing: 0, arch: 0, vertical: false },
     stampFill: "#111111",
+    orderNo: null,
   };
 
   /* ================= 初期化 ================= */
@@ -100,11 +101,17 @@
 
     /* STEP3 */
     $("#btnPrint").addEventListener("click", printQuoteSheet);
-    $("#btnOrderMail").addEventListener("click", orderByMail);
+    $("#btnOrder").addEventListener("click", submitOrder);
+    $("#btnProductionSet").addEventListener("click", downloadProductionSet);
+    $("#btnSpec").addEventListener("click", printSpecSheet);
     $("#btnDlPng").addEventListener("click", downloadPNG);
     $("#btnDlSvg").addEventListener("click", downloadSVG);
     $("#btnDlJson").addEventListener("click", downloadJSON);
     $("#customerName").addEventListener("input", autosave);
+    ["#ordCompany", "#ordEmail", "#ordTel", "#ordZip", "#ordAddr", "#ordDue", "#ordNote"].forEach((id) => {
+      const el = $(id);
+      if (el) el.addEventListener("input", autosave);
+    });
   }
 
   /* ================= ステップ制御 ================= */
@@ -628,13 +635,11 @@
     const body = $("#quoteBody");
     const alerts = $("#quoteAlerts");
 
-    /* 警告・エラー表示 */
+    /* 警告・エラー表示（見積もり＋製造適性） */
     let alertHtml = "";
-    for (const e of q.errors || []) alertHtml += `<div class="alert error">✕ ${e}</div>`;
-    for (const w of q.warnings || []) alertHtml += `<div class="alert warn">⚠ ${w}</div>`;
-    for (const pl of placements.filter((x) => x.lowRes)) {
-      alertHtml += `<div class="alert warn">⚠ ${pl.areaName}: 画像の解像度が低いため粗く仕上がる可能性があります。</div>`;
-    }
+    for (const e of q.errors || []) alertHtml += `<div class="alert error">✕ ${escapeHtml(e)}</div>`;
+    for (const w of q.warnings || []) alertHtml += `<div class="alert warn">⚠ ${escapeHtml(w)}</div>`;
+    for (const w of productionWarnings(placements)) alertHtml += `<div class="alert warn">⚠ ${escapeHtml(w)}</div>`;
     alerts.innerHTML = alertHtml;
 
     /* デザインサマリ */
@@ -734,35 +739,139 @@
     window.print();
   }
 
-  /* ================= 注文メール・ダウンロード ================= */
+  /* ================= 色の解決（入稿指示書用） ================= */
 
-  function orderByMail() {
-    const q = app.lastQuote;
+  /* 使用hexを、加工方法のパレット（糸/インク）の色名・コードへ逆引き */
+  function resolveColor(hex, methodId) {
+    const m = methodOf(methodId);
+    const h = String(hex || "").toLowerCase();
+    let palette = null;
+    if (m.colorMode === "palette") palette = m.palette === "thread" ? THREAD_COLORS : INK_COLORS;
+    if (palette) {
+      const found = palette.find((c) => c.hex.toLowerCase() === h);
+      if (found) return { hex: h, name: found.name, code: found.code || "" };
+    }
+    return { hex: h, name: h.toUpperCase(), code: "" };
+  }
+  function placementColors(pl) {
+    if (pl.hasImage) return [];
+    return (pl.usedColors || []).map((hex) => resolveColor(hex, pl.methodId));
+  }
+  function colorLabel(c) {
+    return c.code ? `${c.name}（${c.code}）` : c.name;
+  }
+
+  /* 濃色ボディ×シルクで白下地版が要るか */
+  function needsUnderbase(pl) {
     const p = Editor.state.product;
-    if (!p) return;
+    const body = p && p.colors.find((c) => c.id === Editor.state.colorId);
+    if (!body || !body.dark) return false;
+    if (pl.methodId !== "silk") return false;
+    // 白1色のみのデザインは下地不要
+    const cols = placementColors(pl);
+    const nonWhite = cols.filter((c) => c.hex !== "#ffffff" && c.hex !== "#fff");
+    return nonWhite.length > 0;
+  }
+
+  /* 製造適性の警告（刺繍の微小文字・低解像度画像） */
+  function productionWarnings(placements) {
+    const out = [];
+    for (const pl of placements) {
+      if (pl.methodId === "embroidery" && pl.minTextMm != null && pl.minTextMm < 5) {
+        out.push(`${pl.areaName}：文字が小さく（約${pl.minTextMm.toFixed(1)}mm）、刺繍では潰れる可能性があります。文字は5mm以上を推奨します。`);
+      }
+      if (pl.hasImage && pl.minImageDpi != null && pl.minImageDpi < 150) {
+        out.push(`${pl.areaName}：画像の解像度が低め（約${Math.round(pl.minImageDpi)}dpi）です。原寸プリントでは粗くなる場合があります（150dpi以上推奨）。`);
+      }
+      if (needsUnderbase(pl)) {
+        out.push(`${pl.areaName}：濃色ボディにシルクプリントのため、別途「白下地版（アンダーベース）」が必要です（版代が1版分加算される場合があります）。`);
+      }
+    }
+    return out;
+  }
+
+  /* ================= 注文データの組み立て ================= */
+
+  function orderNumber() {
+    if (app.orderNo) return app.orderNo;
+    const d = new Date();
+    const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+    const rnd = String(Math.floor(1000 + (Date.now() % 9000)));
+    app.orderNo = `${(CONFIG.ORDER && CONFIG.ORDER.autoNumber) || "ORD"}-${ymd}-${rnd}`;
+    return app.orderNo;
+  }
+
+  const CONTACT_FIELDS = {
+    company: "#ordCompany", name: "#customerName", email: "#ordEmail", tel: "#ordTel",
+    zip: "#ordZip", address: "#ordAddr", dueDate: "#ordDue", note: "#ordNote",
+  };
+  function contactInfo() {
+    const out = {};
+    for (const k in CONTACT_FIELDS) { const el = $(CONTACT_FIELDS[k]); out[k] = el ? el.value.trim() : ""; }
+    return out;
+  }
+  function applyContact(c) {
+    if (!c) return;
+    for (const k in CONTACT_FIELDS) { const el = $(CONTACT_FIELDS[k]); if (el && c[k] != null) el.value = String(c[k]).slice(0, 300); }
+  }
+
+  /* 構造化された注文データ（メール本文・JSON・POST に共通で使う） */
+  function buildOrder() {
+    const p = Editor.state.product;
+    const q = app.lastQuote;
     const placements = Editor.getPlacements();
-    const sizes = p.sizes.filter((s) => app.quantities[s] > 0).map((s) => `${s}:${app.quantities[s]}枚`).join(" / ") || "（未入力）";
     const color = p.colors.find((c) => c.id === Editor.state.colorId);
-    const lines = [
-      "【デザインシミュレーターからの注文・問い合わせ】", "",
-      `商品：${p.name}`,
-      `カラー：${color ? color.name : "-"}`,
-      `数量：${sizes}`,
-      ...placements.map((pl) => `・${pl.areaName}：${methodOf(pl.methodId).name} ${pl.hasImage ? "フルカラー" : pl.colorCount + "色"} 約${(pl.widthMm / 10).toFixed(1)}×${(pl.heightMm / 10).toFixed(1)}cm`),
-      "",
-      q && q.ok ? `概算合計：${Quote.yen(q.total)}（税込）` : "概算：未計算",
-      "",
-      "※ このメールにデザインデータ（保存したJSONファイル）を添付してお送りください。",
-    ];
-    location.href = `mailto:${SHOP.email}?subject=${encodeURIComponent("【見積もり・注文】" + p.name)}&body=${encodeURIComponent(lines.join("\n"))}`;
+    const sizes = p.sizes.filter((s) => app.quantities[s] > 0).map((s) => ({ size: s, qty: app.quantities[s] }));
+    return {
+      orderNo: orderNumber(),
+      createdAt: new Date().toISOString(),
+      product: { id: p.id, name: p.name, color: color ? color.name : "", colorDark: !!(color && color.dark) },
+      quantities: sizes,
+      totalQty: q ? q.totalQty : 0,
+      placements: placements.map((pl) => ({
+        area: pl.areaName, view: pl.view, method: methodOf(pl.methodId).name,
+        colors: pl.hasImage ? "フルカラー" : placementColors(pl).map(colorLabel),
+        widthMm: Math.round(pl.widthMm), heightMm: Math.round(pl.heightMm),
+        underbase: needsUnderbase(pl),
+      })),
+      amountTotal: q && q.ok ? q.total : null,
+      contact: contactInfo(),
+    };
+  }
+
+  /* 注文の本文テキスト（メール・フォールバック共通） */
+  function orderText(order) {
+    const L = [];
+    L.push(`【ご注文】注文番号: ${order.orderNo}`, "");
+    const c = order.contact;
+    L.push("■ お客様情報");
+    if (c.company) L.push(`会社名：${c.company}`);
+    L.push(`お名前：${c.name || "（未記入）"}`);
+    L.push(`メール：${c.email || "（未記入）"}`);
+    L.push(`電話：${c.tel || "（未記入）"}`);
+    if (c.zip || c.address) L.push(`納品先：〒${c.zip} ${c.address}`);
+    if (c.dueDate) L.push(`希望納期：${c.dueDate}`);
+    if (c.note) L.push(`備考：${c.note}`);
+    L.push("", "■ ご注文内容");
+    L.push(`商品：${order.product.name}（${order.product.color}）`);
+    L.push(`数量：${order.quantities.map((x) => `${x.size}:${x.qty}枚`).join(" / ")}（計${order.totalQty}枚）`);
+    for (const pl of order.placements) {
+      const col = Array.isArray(pl.colors) ? pl.colors.join("・") : pl.colors;
+      L.push(`・${pl.area}：${pl.method} / ${col} / 約${(pl.widthMm / 10).toFixed(1)}×${(pl.heightMm / 10).toFixed(1)}cm${pl.underbase ? " ※白下地版必要" : ""}`);
+    }
+    L.push("", `概算合計：${order.amountTotal != null ? Quote.yen(order.amountTotal) + "（税込）" : "未計算"}`);
+    L.push("", "※ デザインの入稿データ（SVG）とプレビュー、デザインデータ(JSON)を添付します。");
+    return L.join("\n");
   }
 
   function download(filename, blob) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a); // 一部ブラウザは DOM 接続時のみ download 属性を尊重
     a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 5000);
   }
 
   function stamp() {
@@ -774,11 +883,11 @@
     if (!Editor.state.product) { alert("商品を選択してください。"); return; }
     const data = {
       app: "mitsumori-design-simulator",
-      version: 1,
+      version: 2,
       savedAt: new Date().toISOString(),
       editor: Editor.serialize(),
       quantities: app.quantities,
-      customerName: $("#customerName") ? $("#customerName").value : "",
+      contact: contactInfo(),
     };
     download(`design_${stamp()}.json`, new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
   }
@@ -790,7 +899,8 @@
         const data = JSON.parse(reader.result);
         if (!Editor.load(data.editor)) throw new Error("bad data");
         app.quantities = cleanQuantities(data.quantities);
-        if (data.customerName && $("#customerName")) $("#customerName").value = String(data.customerName).slice(0, 100);
+        applyContact(data.contact);
+        if (data.customerName && $("#customerName")) $("#customerName").value = String(data.customerName).slice(0, 100); // 旧形式
         goStep(2);
         renderEditorPanels();
       } catch (e) {
@@ -827,6 +937,242 @@
       .catch(() => alert("PNGの生成に失敗しました。SVG形式をお試しください。"));
   }
 
+  /* ================= 入稿データ（製造用） ================= */
+
+  const AREA_SUFFIX = (id) => id;
+
+  /* 入稿データ一式：位置ごとの入稿SVG(実寸・モックアップ無し) + 透過PNG + 指示書 + JSON */
+  async function downloadProductionSet() {
+    const p = Editor.state.product;
+    if (!p) return;
+    const areas = Editor.designAreas();
+    if (!areas.length) { toast("先にデザインを作成してください", "warn"); return; }
+    const no = orderNumber();
+    let n = 0;
+    for (const aid of areas) {
+      const meta = Editor.areaMeta(aid);
+      const svg = Editor.exportProductionSVG(aid);
+      if (svg) { download(`${no}_${meta.name}_入稿.svg`, new Blob([svg], { type: "image/svg+xml" })); n++; }
+      try {
+        const png = await Editor.exportProductionPNG(aid, 200);
+        download(`${no}_${meta.name}_入稿.png`, png);
+      } catch (e) { /* PNGは補助なので失敗は無視 */ }
+    }
+    // 指示書HTMLとデザインデータJSON
+    download(`${no}_指示書.html`, new Blob([specSheetHTML()], { type: "text/html" }));
+    downloadJSON();
+    toast(`入稿データ一式（${n}面）を書き出しました`);
+  }
+
+  /* 版下指示書（入稿指示書）のHTML。加工方法ごとに必要情報を出し分ける */
+  function specSheetHTML() {
+    const order = buildOrder();
+    const p = Editor.state.product;
+    const placements = Editor.getPlacements();
+    const warns = productionWarnings(placements);
+
+    const sections = placements.map((pl) => {
+      const m = methodOf(pl.methodId);
+      const thumb = Editor.areaThumbSVG(p.printAreas.find((a) => a.id === pl.areaId));
+      let detail = "";
+      if (pl.hasImage) {
+        detail = `<tr><th>データ形式</th><td>フルカラー（インクジェット）。透過PNG／原寸。実効解像度 約${pl.minImageDpi ? Math.round(pl.minImageDpi) : "-"}dpi（150dpi以上推奨）。カラーはsRGB前提・当社でCMYK変換。</td></tr>`;
+      } else {
+        const cols = placementColors(pl);
+        const rows = cols.map((c, i) =>
+          `<tr><td><span class="chip" style="background:${c.hex}"></span></td><td>${i + 1}版</td><td>${escapeHtml(c.name)}</td><td>${c.code ? escapeHtml(c.code) : "（色指定未設定）"}</td></tr>`).join("");
+        const sepLabel = pl.methodId === "silk" ? "色版分解（1色=1版）" : "使用糸色";
+        detail = `<tr><th>${sepLabel}</th><td>
+          <table class="cols"><tr><th></th><th>版</th><th>色名</th><th>指定色/糸番</th></tr>${rows}</table>
+          ${needsUnderbase(pl) ? '<p class="u">＋ 白下地版（アンダーベース）1版</p>' : ""}
+          ${pl.methodId === "embroidery" ? '<p class="u">※ 刺繍データ（DST/PES）は当社にてデジタイズします。</p>' : ""}
+        </td></tr>`;
+      }
+      return `<div class="spec-area">
+        <div class="spec-fig">${thumb}</div>
+        <table class="spec-tbl">
+          <tr><th>プリント位置</th><td><b>${escapeHtml(pl.areaName)}</b>（${pl.view === "back" ? "背面" : "前面"}）</td></tr>
+          <tr><th>加工方法</th><td>${m.icon} ${escapeHtml(m.name)}</td></tr>
+          <tr><th>仕上がり実寸</th><td>約 ${(pl.widthMm / 10).toFixed(1)} × ${(pl.heightMm / 10).toFixed(1)} cm（範囲最大 ${pl.areaId && Editor.areaMeta(pl.areaId).mmW / 10}×${Editor.areaMeta(pl.areaId).mmH / 10}cm）</td></tr>
+          ${detail}
+        </table>
+      </div>`;
+    }).join("");
+
+    const contactRows = [];
+    const c = order.contact;
+    if (c.company) contactRows.push(`会社名：${escapeHtml(c.company)}`);
+    contactRows.push(`お名前：${escapeHtml(c.name || "-")}`, `メール：${escapeHtml(c.email || "-")}`, `電話：${escapeHtml(c.tel || "-")}`);
+    if (c.zip || c.address) contactRows.push(`納品先：〒${escapeHtml(c.zip)} ${escapeHtml(c.address)}`);
+    if (c.dueDate) contactRows.push(`希望納期：${escapeHtml(c.dueDate)}`);
+
+    return `<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><title>入稿指示書 ${order.orderNo}</title>
+<style>
+  body{font-family:"Noto Sans JP",sans-serif;color:#111;margin:24px;font-size:13px;line-height:1.7}
+  h1{font-size:20px;letter-spacing:.1em;border-bottom:3px solid #111;padding-bottom:6px}
+  .meta{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:10px 0 18px;font-size:12px}
+  .spec-area{display:flex;gap:16px;border:1px solid #999;border-radius:8px;padding:12px;margin:12px 0;page-break-inside:avoid}
+  .spec-fig svg{width:150px;height:150px;border:1px solid #ddd;background:#fff}
+  .spec-tbl{border-collapse:collapse;flex:1}
+  .spec-tbl th,.spec-tbl td{border:1px solid #ccc;padding:6px 9px;text-align:left;vertical-align:top}
+  .spec-tbl th{background:#f2f2f2;white-space:nowrap;width:120px}
+  table.cols{border-collapse:collapse;margin:2px 0}
+  table.cols th,table.cols td{border:1px solid #ddd;padding:3px 8px;font-size:12px}
+  .chip{display:inline-block;width:16px;height:16px;border:1px solid #999;border-radius:3px;vertical-align:middle}
+  .u{color:#b26a00;font-size:12px;margin:4px 0 0}
+  .warn{background:#fff6e6;border:1px solid #e0b060;border-radius:6px;padding:8px 12px;margin:12px 0;font-size:12px}
+  .note{color:#555;font-size:11px;margin-top:16px;line-height:1.9}
+</style></head><body>
+  <h1>入 稿 指 示 書</h1>
+  <div class="meta">
+    <div><b>注文番号：${order.orderNo}</b><br>${escapeHtml(order.product.name)}／カラー：${escapeHtml(order.product.color)}<br>数量：${order.quantities.map((x) => `${x.size}:${x.qty}`).join(" / ")}（計${order.totalQty}枚）</div>
+    <div style="text-align:right">${contactRows.join("<br>")}</div>
+  </div>
+  ${warns.length ? `<div class="warn">⚠ 製造上の注意：<br>${warns.map(escapeHtml).join("<br>")}</div>` : ""}
+  ${sections}
+  <div class="note">
+    ※ 各プリント位置の入稿データ（SVG＝原寸ベクター／PNG＝透過原寸）を同梱しています。<br>
+    ※ 文字は書体参照で書き出されています。確定製版前に当社にてアウトライン化（パス化）します。<br>
+    ※ 色は画面表示（sRGB）です。実際のインク・糸色は上記の色名／指定色を基準とします。
+  </div>
+</body></html>`;
+  }
+
+  /* 指示書を印刷（新規ウィンドウ） */
+  function printSpecSheet() {
+    const p = Editor.state.product;
+    if (!p || !Editor.designAreas().length) { toast("先にデザインを作成してください", "warn"); return; }
+    const w = window.open("", "_blank");
+    if (!w) { toast("ポップアップがブロックされました。ダウンロードをご利用ください", "warn"); return; }
+    w.document.write(specSheetHTML());
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 300);
+  }
+
+  /* ================= 注文送信 ================= */
+
+  function validateOrder() {
+    const errs = [];
+    const p = Editor.state.product;
+    if (!p) errs.push("商品が選択されていません。");
+    if (!hasAnyDesign()) errs.push("デザインが作成されていません。");
+    const totalQty = p ? p.sizes.reduce((s, sz) => s + cleanQty(app.quantities[sz]), 0) : 0;
+    if (totalQty < 1) errs.push("数量が入力されていません。");
+    const c = contactInfo();
+    if (!c.name) errs.push("お名前を入力してください。");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email)) errs.push("有効なメールアドレスを入力してください。");
+    if (!c.tel) errs.push("電話番号を入力してください。");
+    const agree = $("#ordAgree");
+    if (agree && !agree.checked) errs.push("利用規約・特定商取引法の表記に同意してください。");
+    return errs;
+  }
+
+  async function submitOrder() {
+    const errs = validateOrder();
+    if (errs.length) {
+      renderOrderErrors(errs);
+      $("#orderErrors").scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    renderOrderErrors([]);
+    const order = buildOrder();
+    const btn = $("#btnOrder");
+    btn.disabled = true;
+    const orig = btn.textContent;
+    btn.textContent = "送信中…";
+
+    // 添付ファイル（入稿SVG＋プレビューPNG＋JSON）を用意
+    let files = [];
+    try {
+      if (CONFIG.ORDER.attachFiles) files = await buildOrderFiles(order);
+    } catch (e) { /* 添付生成失敗は本文送信で継続 */ }
+
+    const provider = CONFIG.ORDER.provider;
+    let sent = false;
+    if (provider && provider !== "mailto" && CONFIG.ORDER.endpoint) {
+      sent = await postOrder(order, files).catch(() => false);
+    }
+
+    btn.disabled = false;
+    btn.textContent = orig;
+
+    if (sent) {
+      showOrderComplete(order, true);
+    } else {
+      // フォールバック：メール下書き＋本文コピー＋入稿データDL
+      openMailFallback(order, files);
+      showOrderComplete(order, false);
+    }
+  }
+
+  async function buildOrderFiles(order) {
+    const files = [];
+    for (const aid of Editor.designAreas()) {
+      const meta = Editor.areaMeta(aid);
+      const svg = Editor.exportProductionSVG(aid);
+      if (svg) files.push({ name: `${order.orderNo}_${meta.name}.svg`, blob: new Blob([svg], { type: "image/svg+xml" }) });
+      try { files.push({ name: `${order.orderNo}_${meta.name}.png`, blob: await Editor.exportProductionPNG(aid, 150) }); } catch (e) {}
+    }
+    const json = JSON.stringify({ app: "mitsumori", version: 2, order, editor: Editor.serialize() });
+    files.push({ name: `${order.orderNo}_design.json`, blob: new Blob([json], { type: "application/json" }) });
+    return files;
+  }
+
+  async function postOrder(order, files) {
+    const fd = new FormData();
+    fd.append("orderNo", order.orderNo);
+    fd.append("subject", `【注文】${order.orderNo} ${order.product.name}`);
+    fd.append("message", orderText(order));
+    fd.append("email", order.contact.email);
+    fd.append("_replyto", order.contact.email);
+    if (CONFIG.ORDER.provider === "web3forms" && CONFIG.ORDER.accessKey) fd.append("access_key", CONFIG.ORDER.accessKey);
+    if (CONFIG.ORDER.attachFiles) for (const f of files) fd.append("attachment", f.blob, f.name);
+    const res = await fetch(CONFIG.ORDER.endpoint, { method: "POST", body: fd, headers: { Accept: "application/json" } });
+    return res.ok;
+  }
+
+  function openMailFallback(order, files) {
+    // 入稿データを自動ダウンロードし、メール本文にも全文を載せる
+    if (CONFIG.ORDER.attachFiles && files) files.forEach((f) => download(f.name, f.blob));
+    const to = (CONFIG.ORDER && CONFIG.ORDER.toEmail) || SHOP.email;
+    location.href = `mailto:${to}?subject=${encodeURIComponent(`【注文】${order.orderNo} ${order.product.name}`)}&body=${encodeURIComponent(orderText(order))}`;
+  }
+
+  function renderOrderErrors(errs) {
+    const box = $("#orderErrors");
+    if (!box) return;
+    box.innerHTML = errs.length
+      ? `<div class="alert error">ご注文の前に、次をご確認ください：<ul>${errs.map((e) => `<li>${escapeHtml(e)}</li>`).join("")}</ul></div>`
+      : "";
+  }
+
+  /* 注文完了（または送信手順の案内）画面をオーバーレイ表示 */
+  function showOrderComplete(order, autoSent) {
+    const el = $("#orderComplete");
+    if (!el) return;
+    const to = (CONFIG.ORDER && CONFIG.ORDER.toEmail) || SHOP.email;
+    el.querySelector(".oc-inner").innerHTML = `
+      <div class="oc-badge">${autoSent ? "✅" : "✉"}</div>
+      <h2>${autoSent ? "ご注文を受け付けました" : "メールソフトが開きます"}</h2>
+      <p class="oc-no">注文番号：<b>${escapeHtml(order.orderNo)}</b></p>
+      ${autoSent
+        ? `<p>担当者より${escapeHtml(order.contact.email)}宛に確認のご連絡をいたします。デザイン確認後、正式なお見積もり・納期をご案内します。</p>`
+        : `<p>開いたメールを<b>そのまま送信</b>してください。入稿データ（SVG・PNG・JSON）は自動でダウンロードされました。メールに<b>添付</b>してお送りください。</p>
+           <p class="oc-fallback">メールが開かない場合は、下記の内容を <b>${escapeHtml(to)}</b> へお送りください。</p>
+           <textarea class="oc-text" readonly rows="6">${escapeHtml(orderText(order))}</textarea>
+           <button class="ghost-btn small" id="ocCopy">📋 本文をコピー</button>`}
+      <p class="oc-tel">お急ぎ・ご不明な点は お電話ください：<b>${escapeHtml((CONFIG.LEGAL && CONFIG.LEGAL.tel) || SHOP.tel)}</b></p>
+      <button class="primary-btn" id="ocClose">閉じる</button>
+    `;
+    el.hidden = false;
+    const copy = $("#ocCopy");
+    if (copy) copy.addEventListener("click", () => {
+      navigator.clipboard.writeText(orderText(order)).then(() => toast("本文をコピーしました📋")).catch(() => {});
+    });
+    $("#ocClose").addEventListener("click", () => { el.hidden = true; });
+  }
+
   /* ================= 共有URL =================
    * デザインを deflate 圧縮 + base64url にして URL ハッシュに埋め込みます。
    * サーバー不要でお客様にそのままリンクを送れます（画像は含まれません）。 */
@@ -858,10 +1204,11 @@
       removed += (d.objects || []).length - objs.length;
       designs[k] = { methodId: d.methodId, objects: objs };
     }
+    /* 共有URLは第三者に送るため、個人情報（氏名・連絡先）は一切含めない。
+     * デザインと数量のみを埋め込む。 */
     const payload = JSON.stringify({
       ...data, designs,
       quantities: cleanQuantities(app.quantities),
-      customerName: ($("#customerName") ? $("#customerName").value : "").slice(0, 100),
     });
     let url;
     if (typeof CompressionStream !== "undefined") {
@@ -910,7 +1257,7 @@
       shareLocked = true;
       if (!Editor.load(data)) { shareLocked = false; return false; }
       app.quantities = cleanQuantities(data.quantities || data.q);
-      if ($("#customerName")) $("#customerName").value = (data.customerName || "").slice(0, 100);
+      /* 共有リンクには個人情報を含めない方針のため、連絡先は復元しない */
       ["pointerdown", "keydown"].forEach((ev) =>
         document.addEventListener(ev, function unlock() { shareLocked = false; document.removeEventListener(ev, unlock); }, { once: true }));
       goStep(2);
@@ -935,7 +1282,7 @@
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
         editor: Editor.serialize(),
         quantities: cleanQuantities(app.quantities),
-        customerName: $("#customerName") ? $("#customerName").value : "",
+        contact: contactInfo(),
         savedAt: Date.now(),
       }));
     } catch (e) { /* 容量超過などは無視（画像入りは localStorage 上限に注意） */ }
@@ -951,7 +1298,8 @@
       try {
         if (Editor.load(data.editor)) {
           app.quantities = cleanQuantities(data.quantities);
-          if ($("#customerName")) $("#customerName").value = data.customerName || "";
+          applyContact(data.contact);
+          if (data.customerName && $("#customerName")) $("#customerName").value = data.customerName; // 旧形式
           banner.hidden = true;
           goStep(2);
           renderEditorPanels();

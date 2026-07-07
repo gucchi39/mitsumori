@@ -117,26 +117,70 @@
         <h2>数量を入力してください</h2>
         <p class="hint">数量が多いほど1枚あたりの単価が下がります（数量スライド）。</p>
         <div id="sizeInputs" class="size-inputs"></div>
-        <div class="customer-box">
-          <label>お名前（見積書の宛名・任意）
-            <input type="text" id="customerName" placeholder="例）株式会社サンプル 御中">
-          </label>
-        </div>
         <div id="quoteAlerts"></div>
         <div class="design-summary" id="designSummary"></div>
+
+        <h2 class="form-head">ご注文者情報</h2>
+        <p class="hint">ご注文の場合は必須です（お見積もりのみの場合は不要）。</p>
+        <div class="contact-grid">
+          <label class="full">お名前・会社名 <span class="req">必須</span>
+            <input type="text" id="customerName" autocomplete="name" placeholder="例）山田 太郎">
+          </label>
+          <label>会社・団体名（任意）
+            <input type="text" id="ordCompany" autocomplete="organization" placeholder="例）株式会社サンプル">
+          </label>
+          <label>メール <span class="req">必須</span>
+            <input type="email" id="ordEmail" autocomplete="email" placeholder="例）you@example.com">
+          </label>
+          <label>電話番号 <span class="req">必須</span>
+            <input type="tel" id="ordTel" autocomplete="tel" placeholder="例）090-0000-0000">
+          </label>
+          <label>希望納期（任意）
+            <input type="text" id="ordDue" placeholder="例）○月○日まで">
+          </label>
+          <label>郵便番号（任意）
+            <input type="text" id="ordZip" autocomplete="postal-code" placeholder="000-0000">
+          </label>
+          <label class="full">納品先住所（任意）
+            <input type="text" id="ordAddr" autocomplete="street-address" placeholder="例）○○県○○市○○町 0-0-0">
+          </label>
+          <label class="full">ご要望・備考（任意）
+            <textarea id="ordNote" rows="2" placeholder="配置の希望、色味のご要望など"></textarea>
+          </label>
+        </div>
       </div>
 
       <div class="quote-result">
         <h2>お見積もり</h2>
         <div id="quoteBody"><p class="quote-empty">数量を入力すると自動で計算されます。</p></div>
+
         <div class="quote-actions">
-          <button class="primary-btn" id="btnPrint">🖨 見積書を印刷（PDF保存）</button>
-          <button class="ghost-btn" id="btnOrderMail">✉ この内容で注文・問い合わせ</button>
+          <button class="ghost-btn" id="btnPrint">🖨 見積書を印刷（PDF保存）</button>
+        </div>
+
+        <div class="prod-box">
+          <h3>入稿・製造用データ</h3>
+          <p class="hint">Illustratorでそのまま使える原寸ベクター等を書き出します。</p>
           <div class="dl-row">
+            <button class="ghost-btn small" id="btnProductionSet">📦 入稿データ一式</button>
+            <button class="ghost-btn small" id="btnSpec">📋 入稿指示書を印刷</button>
+          </div>
+          <div class="dl-row">
+            <button class="ghost-btn small" id="btnDlSvg">SVG（面別）</button>
             <button class="ghost-btn small" id="btnDlPng">PNG画像</button>
-            <button class="ghost-btn small" id="btnDlSvg">SVG（入稿用）</button>
             <button class="ghost-btn small" id="btnDlJson">デザインデータ</button>
           </div>
+        </div>
+
+        <div class="order-box">
+          <h3>ご注文</h3>
+          <div id="orderErrors"></div>
+          <label class="agree-row">
+            <input type="checkbox" id="ordAgree">
+            <span><a href="docs/terms.html" target="_blank" rel="noopener">利用規約・特定商取引法の表記</a>に同意し、デザインの使用権限があることを確認しました。</span>
+          </label>
+          <button class="primary-btn full" id="btnOrder">この内容で注文する ▶</button>
+          <p class="order-note">※ ボタンを押すと、入稿データを添えて当社にご注文内容が送信されます（またはメールが開きます）。この時点では料金は発生しません。デザイン確認後に正式なお見積もり・納期をご案内します。</p>
         </div>
       </div>
     </div>
@@ -158,6 +202,11 @@
 
 <!-- ============ 見積書（印刷用） ============ -->
 <div id="quoteSheet" class="quote-sheet" aria-hidden="true"></div>
+
+<!-- ============ 注文完了オーバーレイ ============ -->
+<div id="orderComplete" class="order-complete" hidden>
+  <div class="oc-card"><div class="oc-inner"></div></div>
+</div>
 
 <div id="toastBox" class="toast-box" aria-live="polite"></div>
 

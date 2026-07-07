@@ -21,6 +21,39 @@ const SHOP = {
   minOrderQty: 1,                           // 最小注文枚数
 };
 
+/* ---------- 特商法表記（通信販売では法的に必須） ----------
+ * 実際に注文受付を開始する前に、必ず実在の事業者情報を記入してください。 */
+const LEGAL = {
+  seller: "ミツモリ刺繍プリント",           // 販売事業者名
+  manager: "山田 太郎",                     // 運営責任者
+  address: "〒000-0000 ○○県○○市○○町 0-0-0",
+  tel: "0000-00-0000",
+  email: "info@example.com",
+  hours: "平日 10:00–18:00（土日祝を除く）",
+  deliveryTime: "デザイン確定後 7〜10営業日で発送",
+  payment: "銀行振込 / 各種クレジットカード（別途ご案内）",
+  extraFee: "送料（税込880円、30,000円以上で無料）",
+  returns: "オーダーメイド品のため、お客様都合による返品・交換はお受けできません。不良品は良品と交換します。",
+};
+
+/* ---------- 注文データの受信先設定 ----------
+ * バックエンド無しで注文を確実に受け取るための設定。
+ * endpoint が空の場合は自動的にメール(mailto)方式にフォールバックします。
+ *
+ * 【設定方法（推奨：外部フォームサービス）】
+ *  1. Formspree(https://formspree.io) / Web3Forms(https://web3forms.com) 等で無料登録
+ *  2. 発行された送信先URL(またはアクセスキー)を endpoint に貼り付け
+ *  3. provider を "formspree" 等に設定
+ * これだけで、GitHub Pages の静的サイトのまま注文が貴社に届きます。 */
+const ORDER = {
+  provider: "mailto",         // "formspree" | "web3forms" | "getform" | "custom" | "mailto"
+  endpoint: "",               // 例) "https://formspree.io/f/xxxxxxx"（provider に応じたURL/キー）
+  accessKey: "",              // web3forms の access_key を使う場合はここに
+  toEmail: "info@example.com",// mailto フォールバック時の送信先
+  attachFiles: true,          // 入稿SVG・プレビューPNG・デザインJSONを添付/同送するか
+  autoNumber: "ORD",          // 注文番号の接頭辞（例 ORD-20260707-1234）
+};
+
 /* ---------- 数量スライド（段階割引）の区切り ----------
  * 見積もり単価はこの区分ごとに変わります。tiers の並び順と
  * 各価格表の配列の並び順は対応しています。 */
@@ -33,48 +66,51 @@ const QTY_TIERS = [
   { min: 100, label: "100枚〜" },
 ];
 
-/* ---------- 刺繍糸カラーパレット（20色） ---------- */
+/* ---------- 刺繍糸カラーパレット（20色） ----------
+ * code: 実際の糸番手（例 マデイラ 1800 等）。入稿指示書に出力されます。
+ * 空のままでも動作します（色名で出力）。貴社の使用糸に合わせて記入してください。 */
 const THREAD_COLORS = [
-  { id: "th-white",  name: "ホワイト",     hex: "#f5f5f0" },
-  { id: "th-black",  name: "ブラック",     hex: "#1a1a1a" },
-  { id: "th-red",    name: "レッド",       hex: "#c8102e" },
-  { id: "th-wine",   name: "エンジ",       hex: "#7b1e3b" },
-  { id: "th-pink",   name: "ピンク",       hex: "#e88fb1" },
-  { id: "th-orange", name: "オレンジ",     hex: "#e8721c" },
-  { id: "th-gold",   name: "ゴールド",     hex: "#b8860b" },
-  { id: "th-yellow", name: "イエロー",     hex: "#f2c400" },
-  { id: "th-lime",   name: "黄緑",         hex: "#8db600" },
-  { id: "th-green",  name: "グリーン",     hex: "#1e7d46" },
-  { id: "th-forest", name: "深緑",         hex: "#14452f" },
-  { id: "th-sky",    name: "水色",         hex: "#6ec3e0" },
-  { id: "th-blue",   name: "ブルー",       hex: "#1e5aa8" },
-  { id: "th-navy",   name: "ネイビー",     hex: "#1b2a4a" },
-  { id: "th-purple", name: "パープル",     hex: "#6a3d9a" },
-  { id: "th-brown",  name: "ブラウン",     hex: "#6b4226" },
-  { id: "th-beige",  name: "ベージュ",     hex: "#d9c7a7" },
-  { id: "th-gray",   name: "グレー",       hex: "#8a8d90" },
-  { id: "th-silver", name: "シルバー",     hex: "#c0c4c8" },
-  { id: "th-kin",    name: "金糸",         hex: "#d4af37" },
+  { id: "th-white",  name: "ホワイト",     hex: "#f5f5f0", code: "" },
+  { id: "th-black",  name: "ブラック",     hex: "#1a1a1a", code: "" },
+  { id: "th-red",    name: "レッド",       hex: "#c8102e", code: "" },
+  { id: "th-wine",   name: "エンジ",       hex: "#7b1e3b", code: "" },
+  { id: "th-pink",   name: "ピンク",       hex: "#e88fb1", code: "" },
+  { id: "th-orange", name: "オレンジ",     hex: "#e8721c", code: "" },
+  { id: "th-gold",   name: "ゴールド",     hex: "#b8860b", code: "" },
+  { id: "th-yellow", name: "イエロー",     hex: "#f2c400", code: "" },
+  { id: "th-lime",   name: "黄緑",         hex: "#8db600", code: "" },
+  { id: "th-green",  name: "グリーン",     hex: "#1e7d46", code: "" },
+  { id: "th-forest", name: "深緑",         hex: "#14452f", code: "" },
+  { id: "th-sky",    name: "水色",         hex: "#6ec3e0", code: "" },
+  { id: "th-blue",   name: "ブルー",       hex: "#1e5aa8", code: "" },
+  { id: "th-navy",   name: "ネイビー",     hex: "#1b2a4a", code: "" },
+  { id: "th-purple", name: "パープル",     hex: "#6a3d9a", code: "" },
+  { id: "th-brown",  name: "ブラウン",     hex: "#6b4226", code: "" },
+  { id: "th-beige",  name: "ベージュ",     hex: "#d9c7a7", code: "" },
+  { id: "th-gray",   name: "グレー",       hex: "#8a8d90", code: "" },
+  { id: "th-silver", name: "シルバー",     hex: "#c0c4c8", code: "" },
+  { id: "th-kin",    name: "金糸",         hex: "#d4af37", code: "" },
 ];
 
-/* ---------- シルクスクリーン用インクパレット（16色） ---------- */
+/* ---------- シルクスクリーン用インクパレット（16色） ----------
+ * code: 実際の指定色（例 Pantone 186C / DIC 156 等）。入稿指示書に出力されます。 */
 const INK_COLORS = [
-  { id: "ink-white",  name: "ホワイト",   hex: "#ffffff" },
-  { id: "ink-black",  name: "ブラック",   hex: "#111111" },
-  { id: "ink-red",    name: "レッド",     hex: "#d7263d" },
-  { id: "ink-wine",   name: "ワイン",     hex: "#8e2043" },
-  { id: "ink-pink",   name: "ピンク",     hex: "#f06ea9" },
-  { id: "ink-orange", name: "オレンジ",   hex: "#f4771f" },
-  { id: "ink-yellow", name: "イエロー",   hex: "#ffcf1b" },
-  { id: "ink-lime",   name: "ライム",     hex: "#9acd32" },
-  { id: "ink-green",  name: "グリーン",   hex: "#189a5a" },
-  { id: "ink-sky",    name: "スカイ",     hex: "#3fb7e4" },
-  { id: "ink-blue",   name: "ブルー",     hex: "#2260b0" },
-  { id: "ink-navy",   name: "ネイビー",   hex: "#20304f" },
-  { id: "ink-purple", name: "パープル",   hex: "#7a4bbf" },
-  { id: "ink-brown",  name: "ブラウン",   hex: "#7a4a28" },
-  { id: "ink-gray",   name: "グレー",     hex: "#9098a0" },
-  { id: "ink-gold",   name: "ゴールド",   hex: "#caa64b" },
+  { id: "ink-white",  name: "ホワイト",   hex: "#ffffff", code: "" },
+  { id: "ink-black",  name: "ブラック",   hex: "#111111", code: "" },
+  { id: "ink-red",    name: "レッド",     hex: "#d7263d", code: "" },
+  { id: "ink-wine",   name: "ワイン",     hex: "#8e2043", code: "" },
+  { id: "ink-pink",   name: "ピンク",     hex: "#f06ea9", code: "" },
+  { id: "ink-orange", name: "オレンジ",   hex: "#f4771f", code: "" },
+  { id: "ink-yellow", name: "イエロー",   hex: "#ffcf1b", code: "" },
+  { id: "ink-lime",   name: "ライム",     hex: "#9acd32", code: "" },
+  { id: "ink-green",  name: "グリーン",   hex: "#189a5a", code: "" },
+  { id: "ink-sky",    name: "スカイ",     hex: "#3fb7e4", code: "" },
+  { id: "ink-blue",   name: "ブルー",     hex: "#2260b0", code: "" },
+  { id: "ink-navy",   name: "ネイビー",   hex: "#20304f", code: "" },
+  { id: "ink-purple", name: "パープル",   hex: "#7a4bbf", code: "" },
+  { id: "ink-brown",  name: "ブラウン",   hex: "#7a4a28", code: "" },
+  { id: "ink-gray",   name: "グレー",     hex: "#9098a0", code: "" },
+  { id: "ink-gold",   name: "ゴールド",   hex: "#caa64b", code: "" },
 ];
 
 /* ---------- プリント・加工方法 ----------
@@ -306,7 +342,7 @@ const FREE_COLORS = [
 ];
 
 /* ---------- エクスポート（ブラウザ / Node 両対応） ---------- */
-const CONFIG = { SHOP, QTY_TIERS, THREAD_COLORS, INK_COLORS, METHODS, PRODUCTS, FONTS, FREE_COLORS, BODY_COLORS };
+const CONFIG = { SHOP, LEGAL, ORDER, QTY_TIERS, THREAD_COLORS, INK_COLORS, METHODS, PRODUCTS, FONTS, FREE_COLORS, BODY_COLORS };
 
 if (typeof module !== "undefined" && module.exports) {
   module.exports = CONFIG;
