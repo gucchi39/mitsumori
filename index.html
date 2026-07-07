@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>デザインシミュレーター｜オリジナルウェア自動見積もり</title>
+<meta name="description" content="Tシャツ・ポロシャツ・キャップなどにWEB上でデザインして、その場で自動見積もり。刺繍・シルクスクリーン・フルカラープリント対応。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Shippori+Mincho+B1:wght@600&family=Zen+Maru+Gothic:wght@700&family=Mochiy+Pop+One&family=Yuji+Syuku&family=Yomogi&family=Dela+Gothic+One&family=Anton&family=Playfair+Display:wght@600&family=Pacifico&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar" id="topbar">
+  <div class="brand">
+    <span class="brand-name" id="brandName">SHOP NAME</span>
+    <span class="brand-sub" id="brandSub">デザインシミュレーター</span>
+  </div>
+  <ol class="steps" id="stepNav">
+    <li data-step="1" class="active"><span class="num">1</span>商品選択</li>
+    <li data-step="2"><span class="num">2</span>デザイン</li>
+    <li data-step="3"><span class="num">3</span>お見積もり</li>
+  </ol>
+  <div class="top-actions">
+    <button class="ghost-btn" id="btnSave" title="デザインをファイルに保存">💾 保存</button>
+    <label class="ghost-btn" title="保存したデザインを読み込み">📂 読込<input type="file" id="fileLoad" accept=".json" hidden></label>
+  </div>
+</header>
+
+<main id="main">
+
+  <!-- ============ STEP 1: 商品選択 ============ -->
+  <section id="step1" class="step active">
+    <div class="step1-inner">
+      <h1>商品を選んで、その場でデザイン＆お見積もり</h1>
+      <p class="lead">Illustratorなどの専用ソフトは不要。テキスト・スタンプ・画像で誰でも簡単にデザインでき、刺繍・プリントの概算金額がすぐに分かります。</p>
+      <div id="restoreBanner" class="restore-banner" hidden>
+        <span>前回作成中のデザインがあります。</span>
+        <button class="primary-btn small" id="btnRestore">続きから再開する</button>
+        <button class="ghost-btn small" id="btnDiscard">破棄する</button>
+      </div>
+      <div class="product-grid" id="productGrid"></div>
+    </div>
+  </section>
+
+  <!-- ============ STEP 2: デザイン編集 ============ -->
+  <section id="step2" class="step">
+    <div class="editor-layout">
+
+      <nav class="toolrail" id="toolrail">
+        <button data-tab="color" class="active"><span class="tr-icon">👕</span>カラー</button>
+        <button data-tab="text"><span class="tr-icon">Ｔ</span>テキスト</button>
+        <button data-tab="stamp"><span class="tr-icon">★</span>スタンプ</button>
+        <button data-tab="image"><span class="tr-icon">⬆</span>画像</button>
+        <button data-tab="method"><span class="tr-icon">🧵</span>加工方法</button>
+      </nav>
+
+      <div class="toolpanel" id="toolPanel"></div>
+
+      <div class="canvas-col">
+        <div class="canvas-toolbar">
+          <div class="ct-group">
+            <button id="btnUndo" title="もどる (元に戻す)">↩ もどる</button>
+            <button id="btnRedo" title="やり直す">↪ やり直す</button>
+          </div>
+          <div class="ct-group">
+            <button id="btnZoomOut" title="縮小">−</button>
+            <button id="btnZoomFit" title="全体表示">全体</button>
+            <button id="btnZoomIn" title="拡大">＋</button>
+          </div>
+          <div class="ct-group">
+            <button id="btnGrid" title="グリッド表示">⊞ グリッド</button>
+            <button id="btnPreview" title="仕上がりプレビュー">👁 仕上がり</button>
+          </div>
+        </div>
+        <div class="canvas-wrap" id="canvasWrap">
+          <svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 760"></svg>
+        </div>
+        <div class="position-bar">
+          <span class="pb-label">プリント位置</span>
+          <div class="pb-thumbs" id="positionBar"></div>
+        </div>
+      </div>
+
+      <aside class="side-panel">
+        <div class="side-box">
+          <h3>重ね順（レイヤー）</h3>
+          <div id="layerList" class="layer-list"></div>
+        </div>
+        <div class="side-box" id="areaInfoBox"></div>
+      </aside>
+
+    </div>
+  </section>
+
+  <!-- ============ STEP 3: 見積もり ============ -->
+  <section id="step3" class="step">
+    <div class="quote-layout">
+      <div class="quote-form">
+        <h2>数量を入力してください</h2>
+        <p class="hint">数量が多いほど1枚あたりの単価が下がります（数量スライド）。</p>
+        <div id="sizeInputs" class="size-inputs"></div>
+        <div class="customer-box">
+          <label>お名前（見積書の宛名・任意）
+            <input type="text" id="customerName" placeholder="例）株式会社サンプル 御中">
+          </label>
+        </div>
+        <div id="quoteAlerts"></div>
+        <div class="design-summary" id="designSummary"></div>
+      </div>
+
+      <div class="quote-result">
+        <h2>お見積もり</h2>
+        <div id="quoteBody"><p class="quote-empty">数量を入力すると自動で計算されます。</p></div>
+        <div class="quote-actions">
+          <button class="primary-btn" id="btnPrint">🖨 見積書を印刷（PDF保存）</button>
+          <button class="ghost-btn" id="btnOrderMail">✉ この内容で注文・問い合わせ</button>
+          <div class="dl-row">
+            <button class="ghost-btn small" id="btnDlPng">PNG画像</button>
+            <button class="ghost-btn small" id="btnDlSvg">SVG（入稿用）</button>
+            <button class="ghost-btn small" id="btnDlJson">デザインデータ</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="estimate-bar" id="estimateBar">
+  <div class="eb-total">
+    <span class="eb-label">概算合計（税込）</span>
+    <b id="barTotal">¥ —</b>
+    <span class="eb-per" id="barPer"></span>
+  </div>
+  <div class="eb-nav">
+    <button class="ghost-btn" id="btnPrev" disabled>← 戻る</button>
+    <button class="primary-btn" id="btnNext" disabled>次へ進む ▶</button>
+  </div>
+</footer>
+
+<!-- ============ 見積書（印刷用） ============ -->
+<div id="quoteSheet" class="quote-sheet" aria-hidden="true"></div>
+
+<script src="js/config.js"></script>
+<script src="js/quote.js"></script>
+<script src="js/mockups.js"></script>
+<script src="js/stamps.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

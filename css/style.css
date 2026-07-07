@@ -1,0 +1,347 @@
+/* =========================================================================
+ * style.css — デザインシミュレーター UI
+ * アクセント色などは :root の変数で変更できます。
+ * ========================================================================= */
+:root {
+  --accent: #ff6a13;            /* メインアクセント（オレンジ） */
+  --accent-dark: #e05a08;
+  --ink: #232a35;
+  --sub: #6b7686;
+  --line: #dde2ea;
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --rail: #2b2f36;
+  --radius: 10px;
+  --shadow: 0 2px 10px rgba(25, 35, 55, 0.08);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", sans-serif;
+  color: var(--ink);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; font-size: 14px; }
+
+/* ---------------- ヘッダー ---------------- */
+.topbar {
+  display: flex; align-items: center; gap: 24px;
+  background: #fff; border-bottom: 1px solid var(--line);
+  padding: 10px 20px; position: sticky; top: 0; z-index: 50;
+}
+.brand { display: flex; flex-direction: column; line-height: 1.2; }
+.brand-name { font-weight: 900; font-size: 18px; color: var(--accent); letter-spacing: 0.02em; }
+.brand-sub { font-size: 11px; color: var(--sub); }
+.steps { display: flex; gap: 4px; list-style: none; margin-left: auto; }
+.steps li {
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
+  color: var(--sub); background: transparent;
+}
+.steps li .num {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #cfd6e0; color: #fff; font-size: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.steps li.active { background: #fff2e8; color: var(--accent-dark); }
+.steps li.active .num { background: var(--accent); }
+.steps li.done .num { background: #38b26a; }
+.top-actions { display: flex; gap: 8px; }
+
+/* ---------------- 汎用ボタン ---------------- */
+.primary-btn {
+  background: var(--accent); color: #fff; border: none;
+  padding: 12px 26px; border-radius: var(--radius);
+  font-size: 15px; font-weight: 700; box-shadow: var(--shadow);
+  transition: background 0.15s;
+}
+.primary-btn:hover { background: var(--accent-dark); }
+.primary-btn:disabled { background: #c9ced6; cursor: not-allowed; box-shadow: none; }
+.ghost-btn {
+  background: #fff; color: var(--ink); border: 1px solid var(--line);
+  padding: 10px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.ghost-btn:hover { border-color: var(--accent); color: var(--accent-dark); }
+.primary-btn.small, .ghost-btn.small { padding: 7px 14px; font-size: 12px; }
+
+/* ---------------- ステップ表示 ---------------- */
+main { flex: 1; }
+.step { display: none; }
+.step.active { display: block; }
+
+/* ---------------- STEP1 商品選択 ---------------- */
+.step1-inner { max-width: 1080px; margin: 0 auto; padding: 36px 20px 60px; }
+.step1-inner h1 { font-size: 26px; margin-bottom: 10px; }
+.lead { color: var(--sub); margin-bottom: 22px; font-size: 14px; }
+.restore-banner {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: #fff8ef; border: 1px solid #ffd9b8; border-radius: var(--radius);
+  padding: 12px 16px; margin-bottom: 20px; font-size: 14px;
+}
+.product-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px;
+}
+.product-card {
+  background: var(--panel); border: 2px solid transparent; border-radius: 14px;
+  box-shadow: var(--shadow); padding: 14px; text-align: left; transition: 0.15s;
+}
+.product-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.product-card svg { width: 100%; height: 170px; display: block; }
+.product-card .pc-cat { font-size: 11px; color: var(--accent-dark); font-weight: 700; }
+.product-card .pc-name { font-size: 15px; font-weight: 700; margin: 2px 0; }
+.product-card .pc-price { font-size: 13px; color: var(--sub); }
+.product-card .pc-price b { color: var(--ink); font-size: 16px; }
+.product-card .pc-note { font-size: 11px; color: var(--sub); margin-top: 6px; }
+.product-card .pc-badges { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
+.pc-badge { font-size: 10px; background: #eef1f6; border-radius: 4px; padding: 2px 7px; color: var(--sub); font-weight: 600; }
+
+/* ---------------- STEP2 エディタ ---------------- */
+.editor-layout {
+  display: grid;
+  grid-template-columns: 74px 264px 1fr 240px;
+  gap: 0;
+  height: calc(100vh - 60px - 64px);
+  min-height: 540px;
+}
+.toolrail {
+  background: var(--rail); display: flex; flex-direction: column; padding-top: 8px;
+}
+.toolrail button {
+  background: none; border: none; color: #aab2bd;
+  padding: 13px 4px; font-size: 11px; font-weight: 700;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  border-left: 3px solid transparent;
+}
+.toolrail button .tr-icon { font-size: 19px; font-style: normal; }
+.toolrail button.active { color: #fff; background: rgba(255, 255, 255, 0.08); border-left-color: var(--accent); }
+.toolrail button:hover { color: #fff; }
+
+.toolpanel {
+  background: var(--panel); border-right: 1px solid var(--line);
+  overflow-y: auto; padding: 16px 14px;
+}
+.toolpanel h3 { font-size: 13px; margin-bottom: 10px; color: var(--ink); }
+.toolpanel .tp-section { margin-bottom: 18px; }
+.tp-label { font-size: 11.5px; font-weight: 700; color: var(--sub); display: block; margin: 10px 0 5px; }
+.toolpanel textarea, .toolpanel select, .toolpanel input[type="text"] {
+  width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px;
+}
+.toolpanel textarea { resize: vertical; min-height: 54px; }
+.toolpanel input[type="range"] { width: 100%; accent-color: var(--accent); }
+.range-row { display: flex; align-items: center; gap: 8px; }
+.range-row output { font-size: 12px; color: var(--sub); min-width: 34px; text-align: right; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 7px; }
+.swatch {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.12); padding: 0;
+  position: relative; flex: 0 0 auto;
+}
+.swatch.selected { outline: 3px solid var(--accent); outline-offset: 2px; }
+.swatch-name { font-size: 11px; color: var(--sub); margin-top: 6px; min-height: 15px; }
+
+.stamp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.stamp-btn {
+  background: #f6f8fb; border: 1px solid var(--line); border-radius: 8px;
+  aspect-ratio: 1; padding: 8px;
+}
+.stamp-btn:hover { border-color: var(--accent); background: #fff4ec; }
+.stamp-btn svg { width: 100%; height: 100%; }
+
+.upload-zone {
+  border: 2px dashed var(--line); border-radius: var(--radius);
+  padding: 26px 12px; text-align: center; color: var(--sub); font-size: 12.5px;
+  background: #fafbfd; cursor: pointer;
+}
+.upload-zone.dragover { border-color: var(--accent); background: #fff4ec; }
+.upload-note { font-size: 11px; color: var(--sub); margin-top: 10px; line-height: 1.7; }
+
+.method-option {
+  display: block; border: 2px solid var(--line); border-radius: var(--radius);
+  padding: 10px 12px; margin-bottom: 8px; cursor: pointer; background: #fff;
+}
+.method-option.selected { border-color: var(--accent); background: #fff8f2; }
+.method-option .mo-name { font-weight: 700; font-size: 13.5px; }
+.method-option .mo-desc { font-size: 11px; color: var(--sub); margin-top: 3px; line-height: 1.5; }
+.method-option input { margin-right: 6px; accent-color: var(--accent); }
+
+.canvas-col { display: flex; flex-direction: column; min-width: 0; }
+.canvas-toolbar {
+  display: flex; gap: 14px; padding: 8px 12px; background: #fff;
+  border-bottom: 1px solid var(--line); flex-wrap: wrap;
+}
+.ct-group { display: flex; gap: 4px; }
+.canvas-toolbar button {
+  background: #fff; border: 1px solid var(--line); border-radius: 7px;
+  padding: 6px 11px; font-size: 12px; font-weight: 600; color: var(--ink);
+}
+.canvas-toolbar button:hover { border-color: var(--accent); color: var(--accent-dark); }
+.canvas-toolbar button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+.canvas-wrap {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; background: repeating-conic-gradient(#f1f3f7 0% 25%, #fafbfd 0% 50%) 50% / 26px 26px;
+  position: relative;
+}
+#stage { width: 100%; height: 100%; touch-action: none; user-select: none; }
+#stage .obj.editable { cursor: move; }
+
+.position-bar {
+  display: flex; align-items: center; gap: 12px;
+  background: #fff; border-top: 1px solid var(--line); padding: 8px 14px;
+}
+.pb-label { font-size: 12px; font-weight: 700; color: var(--sub); flex: 0 0 auto; }
+.pb-thumbs { display: flex; gap: 8px; overflow-x: auto; }
+.pos-thumb {
+  border: 2px solid var(--line); background: #fff; border-radius: 8px;
+  width: 76px; padding: 5px 4px 3px; flex: 0 0 auto; position: relative;
+}
+.pos-thumb.selected { border-color: var(--accent); background: #fff8f2; }
+.pos-thumb svg { width: 100%; height: 44px; display: block; }
+.pos-thumb .pt-name { font-size: 10px; font-weight: 700; color: var(--sub); display: block; margin-top: 2px; }
+.pos-thumb.selected .pt-name { color: var(--accent-dark); }
+.pos-thumb .pt-count {
+  position: absolute; top: -7px; right: -7px; background: var(--accent); color: #fff;
+  border-radius: 50%; width: 19px; height: 19px; font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.side-panel {
+  background: var(--panel); border-left: 1px solid var(--line);
+  overflow-y: auto; padding: 14px 12px; display: flex; flex-direction: column; gap: 14px;
+}
+.side-box h3 { font-size: 12.5px; margin-bottom: 8px; }
+.layer-list { display: flex; flex-direction: column; gap: 5px; min-height: 40px; }
+.layer-row {
+  display: flex; align-items: center; gap: 6px;
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px;
+  font-size: 12px; background: #fff; cursor: pointer;
+}
+.layer-row.selected { border-color: var(--accent); background: #fff8f2; }
+.layer-row .lr-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.layer-row button {
+  background: none; border: none; font-size: 13px; color: var(--sub); padding: 2px 4px;
+}
+.layer-row button:hover { color: var(--accent-dark); }
+.layer-empty { font-size: 11.5px; color: var(--sub); }
+.area-info { font-size: 12px; color: var(--sub); line-height: 1.8; }
+.area-info b { color: var(--ink); }
+.method-chip {
+  display: inline-block; background: #eef7f0; color: #237a46; border-radius: 5px;
+  font-size: 11px; font-weight: 700; padding: 2px 8px;
+}
+
+/* ---------------- STEP3 見積もり ---------------- */
+.quote-layout {
+  max-width: 1080px; margin: 0 auto; padding: 30px 20px 60px;
+  display: grid; grid-template-columns: 1fr 1.2fr; gap: 28px; align-items: start;
+}
+.quote-form, .quote-result {
+  background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); padding: 24px;
+}
+.quote-form h2, .quote-result h2 { font-size: 18px; margin-bottom: 6px; }
+.hint { font-size: 12px; color: var(--sub); margin-bottom: 16px; }
+.size-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.size-cell label { font-size: 12px; font-weight: 700; color: var(--sub); display: block; margin-bottom: 4px; }
+.size-cell input {
+  width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 9px 8px;
+  font-size: 16px; text-align: center;
+}
+.size-cell input:focus { border-color: var(--accent); outline: none; }
+.size-note { font-size: 10.5px; color: var(--sub); }
+.customer-box { margin-top: 18px; }
+.customer-box label { font-size: 12px; font-weight: 700; color: var(--sub); }
+.customer-box input { width: 100%; margin-top: 5px; border: 1px solid var(--line); border-radius: 8px; padding: 9px; }
+
+.alert { border-radius: 8px; padding: 10px 12px; font-size: 12.5px; margin-top: 14px; line-height: 1.6; }
+.alert.warn { background: #fff8e8; border: 1px solid #f0d890; color: #8a6d1a; }
+.alert.error { background: #fdeeee; border: 1px solid #f0b6b6; color: #a13030; }
+
+.design-summary { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px; }
+.ds-item {
+  border: 1px solid var(--line); border-radius: 10px; padding: 8px; width: 108px;
+  text-align: center; background: #fff;
+}
+.ds-item svg { width: 100%; height: 62px; }
+.ds-item .ds-name { font-size: 11px; font-weight: 700; }
+.ds-item .ds-meta { font-size: 10px; color: var(--sub); }
+
+.quote-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+.quote-table th {
+  text-align: left; font-size: 11px; color: var(--sub); font-weight: 700;
+  border-bottom: 2px solid var(--line); padding: 6px 8px;
+}
+.quote-table td { border-bottom: 1px solid var(--line); padding: 8px; vertical-align: top; }
+.quote-table td.num, .quote-table th.num { text-align: right; white-space: nowrap; }
+.quote-table .q-detail { font-size: 11px; color: var(--sub); display: block; }
+.quote-totals { margin-top: 14px; border-top: 2px solid var(--ink); padding-top: 12px; }
+.qt-row { display: flex; justify-content: space-between; font-size: 13.5px; padding: 3px 4px; }
+.qt-row.total { font-size: 20px; font-weight: 900; color: var(--accent-dark); padding-top: 8px; }
+.qt-row.per { color: var(--sub); font-size: 12.5px; }
+.quote-empty { color: var(--sub); font-size: 13px; padding: 20px 0; }
+.quote-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
+.dl-row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ---------------- 概算バー ---------------- */
+.estimate-bar {
+  position: sticky; bottom: 0; z-index: 50;
+  background: #fff; border-top: 2px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 22px; gap: 16px;
+}
+.eb-label { font-size: 11px; color: var(--sub); font-weight: 700; display: block; }
+.eb-total b { font-size: 24px; color: var(--accent-dark); letter-spacing: 0.01em; }
+.eb-per { font-size: 12px; color: var(--sub); margin-left: 10px; }
+.eb-nav { display: flex; gap: 10px; }
+
+/* ---------------- 見積書（印刷用） ---------------- */
+.quote-sheet { display: none; }
+@media print {
+  body > *:not(#quoteSheet) { display: none !important; }
+  body { background: #fff; display: block; }
+  .quote-sheet { display: block; padding: 10mm 12mm; font-size: 12px; color: #000; }
+  .qs-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8mm; }
+  .qs-title { font-size: 26px; letter-spacing: 0.35em; font-weight: 700; }
+  .qs-shop { text-align: right; font-size: 11px; line-height: 1.7; }
+  .qs-shop .qs-shopname { font-size: 14px; font-weight: 700; }
+  .qs-to { font-size: 16px; border-bottom: 1.5px solid #000; display: inline-block; padding: 2px 30px 2px 4px; margin-bottom: 4mm; }
+  .qs-meta { font-size: 11px; margin-bottom: 5mm; }
+  .qs-grand { font-size: 18px; font-weight: 700; border: 2px solid #000; display: inline-block; padding: 3mm 10mm; margin-bottom: 5mm; }
+  .qs-table { width: 100%; border-collapse: collapse; margin-bottom: 5mm; }
+  .qs-table th, .qs-table td { border: 1px solid #555; padding: 2mm 2.5mm; }
+  .qs-table th { background: #f0f0f0; font-size: 11px; }
+  .qs-table td.num { text-align: right; }
+  .qs-table td .q-detail { color: #555; font-size: 10px; display: block; }
+  .qs-designs { display: flex; gap: 6mm; flex-wrap: wrap; margin-bottom: 5mm; }
+  .qs-designs figure { text-align: center; font-size: 10px; }
+  .qs-designs svg { width: 34mm; height: 24mm; border: 1px solid #ccc; }
+  .qs-note { font-size: 10px; color: #444; line-height: 1.8; }
+}
+
+/* ---------------- レスポンシブ ---------------- */
+@media (max-width: 1080px) {
+  .editor-layout { grid-template-columns: 64px 230px 1fr; }
+  .side-panel { display: none; }
+  .quote-layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .topbar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .steps { order: 3; width: 100%; justify-content: center; margin-left: 0; }
+  .steps li { padding: 5px 10px; font-size: 11px; }
+  .editor-layout {
+    grid-template-columns: 1fr; grid-template-rows: auto auto minmax(320px, 1fr);
+    height: auto;
+  }
+  .toolrail { flex-direction: row; padding: 0; overflow-x: auto; }
+  .toolrail button { flex: 1; border-left: none; border-bottom: 3px solid transparent; padding: 9px 2px; }
+  .toolrail button.active { border-left: none; border-bottom-color: var(--accent); }
+  .toolpanel { max-height: 300px; border-right: none; border-bottom: 1px solid var(--line); }
+  .canvas-wrap { min-height: 340px; }
+  .eb-total b { font-size: 19px; }
+  .estimate-bar { padding: 8px 12px; }
+}
