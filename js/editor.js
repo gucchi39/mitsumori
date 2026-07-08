@@ -22,6 +22,8 @@
     designs: {},            // { areaId: { methodId, objects: [] } }
     selectedId: null,
     zoom: 1,
+    panX: 0,                // 表示のパン量（ステージ座標）
+    panY: 0,
     showGrid: false,
     preview: false,
   };
@@ -282,7 +284,22 @@
 
   function applyViewBox() {
     const w = VB_W / state.zoom, h = VB_H / state.zoom;
-    svg.setAttribute("viewBox", `${(VB_W - w) / 2} ${(VB_H - h) / 2} ${w} ${h}`);
+    svg.setAttribute("viewBox", `${(VB_W - w) / 2 - state.panX} ${(VB_H - h) / 2 - state.panY} ${w} ${h}`);
+  }
+
+  /* パン量を「はみ出し過ぎない」範囲にクランプ */
+  function clampPan() {
+    const margin = 0.6; // ステージの6割まで動かせる
+    const lim = Math.max(VB_W, VB_H) * margin;
+    state.panX = Math.max(-lim, Math.min(lim, state.panX));
+    state.panY = Math.max(-lim, Math.min(lim, state.panY));
+  }
+
+  /* クライアントpx → ステージ座標系の距離換算係数 */
+  function stageUnitsPerPx() {
+    const rect = svg.getBoundingClientRect();
+    if (!rect.width) return 1;
+    return (VB_W / state.zoom) / rect.width;
   }
 
   function render() {
@@ -379,9 +396,35 @@
 
   let drag = null; // { mode, startPt, obj, orig... }
   const dragGuides = { v: false, h: false }; // 中央スナップの発動状態
+  const pointers = new Map();  // アクティブなポインタ（マルチタッチ検出用）
+  let pinch = null;            // { startDist, startZoom, startMid, startPanX, startPanY }
+
+  function capture(evt) {
+    try { svg.setPointerCapture(evt.pointerId); } catch (e) { /* 合成イベント等では失敗し得る */ }
+  }
+
+  function startPinchIfTwo() {
+    if (pointers.size !== 2) return false;
+    const [a, b] = Array.from(pointers.values());
+    /* オブジェクト操作中に2本目が触れたら、操作を中断してピンチに移行 */
+    drag = null;
+    dragGuides.v = dragGuides.h = false;
+    pinch = {
+      startDist: Math.max(10, Math.hypot(a.x - b.x, a.y - b.y)),
+      startZoom: state.zoom,
+      startMid: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      startPanX: state.panX,
+      startPanY: state.panY,
+    };
+    renderSelection();
+    return true;
+  }
 
   function onPointerDown(evt) {
     if (!state.product || state.preview) return;
+    pointers.set(evt.pointerId, { x: evt.clientX, y: evt.clientY });
+    if (startPinchIfTwo()) { capture(evt); evt.preventDefault(); return; }
+
     const pt = svgPoint(evt);
     const handleEl = evt.target.closest("[data-handle]");
     const obj = selectedObj();
@@ -401,7 +444,7 @@
         startDist: Math.hypot(pt.x - obj.x, pt.y - obj.y),
         startAngle: (Math.atan2(pt.y - obj.y, pt.x - obj.x) * 180) / Math.PI,
       };
-      svg.setPointerCapture(evt.pointerId);
+      capture(evt);
       evt.preventDefault();
       return;
     }
@@ -412,23 +455,50 @@
       state.selectedId = id;
       const o = selectedObj();
       drag = { mode: "move", startPt: pt, obj: o, origX: o.x, origY: o.y };
-      svg.setPointerCapture(evt.pointerId);
+      capture(evt);
       render();
       callbacks.onSelect(o);
       evt.preventDefault();
       return;
     }
 
-    /* 空クリック → 選択解除 */
-    if (state.selectedId) {
-      state.selectedId = null;
-      renderSelection();
-      callbacks.onSelect(null);
-    }
+    /* 空白ドラッグ＝パン。動かず離した場合のみ選択解除（onPointerUpで判定） */
+    drag = { mode: "pan", startClient: { x: evt.clientX, y: evt.clientY }, startPanX: state.panX, startPanY: state.panY };
+    capture(evt);
   }
 
   function onPointerMove(evt) {
+    if (pointers.has(evt.pointerId)) pointers.set(evt.pointerId, { x: evt.clientX, y: evt.clientY });
+
+    /* 2本指ピンチ：ズーム＋パン */
+    if (pinch && pointers.size >= 2) {
+      const [a, b] = Array.from(pointers.values());
+      const dist = Math.max(10, Math.hypot(a.x - b.x, a.y - b.y));
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      state.zoom = Math.max(0.5, Math.min(4, pinch.startZoom * (dist / pinch.startDist)));
+      const k = stageUnitsPerPx();
+      state.panX = pinch.startPanX + (mid.x - pinch.startMid.x) * k;
+      state.panY = pinch.startPanY + (mid.y - pinch.startMid.y) * k;
+      clampPan();
+      applyViewBox();
+      evt.preventDefault();
+      return;
+    }
+
     if (!drag) return;
+
+    if (drag.mode === "pan") {
+      const dx = evt.clientX - drag.startClient.x;
+      const dy = evt.clientY - drag.startClient.y;
+      if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;
+      const k = stageUnitsPerPx();
+      state.panX = drag.startPanX + dx * k;
+      state.panY = drag.startPanY + dy * k;
+      clampPan();
+      applyViewBox();
+      return;
+    }
+
     const pt = svgPoint(evt);
     const o = drag.obj;
     const area = currentArea();
@@ -462,15 +532,46 @@
     render();
   }
 
-  function onPointerUp() {
+  function onPointerUp(evt) {
+    if (evt && evt.pointerId != null) pointers.delete(evt.pointerId);
+    if (pinch) {
+      if (pointers.size < 2) pinch = null; // ピンチ終了（履歴には積まない＝表示操作のみ）
+      return;
+    }
     if (!drag) return;
-    const moved = drag.moved;
+    const d = drag;
     drag = null;
     dragGuides.v = dragGuides.h = false;
+
+    if (d.mode === "pan") {
+      /* 動かさず離した＝空クリック → 選択解除 */
+      if (!d.moved && state.selectedId) {
+        state.selectedId = null;
+        renderSelection();
+        callbacks.onSelect(null);
+      }
+      return;
+    }
+
     /* 単なる選択クリック（未移動）では commit しない
      * → redo履歴の破棄・無変更スナップショットの蓄積を防ぐ */
-    if (moved) commit();
+    if (d.moved) commit();
     callbacks.onSelect(selectedObj());
+  }
+
+  /* ホイールでズーム（デスクトップ）。カーソル位置を中心に寄る */
+  function onWheel(evt) {
+    if (!state.product) return;
+    evt.preventDefault();
+    const factor = evt.deltaY < 0 ? 1.12 : 1 / 1.12;
+    const before = svgPoint(evt);
+    state.zoom = Math.max(0.5, Math.min(4, state.zoom * factor));
+    applyViewBox();
+    const after = svgPoint(evt);
+    state.panX += after.x - before.x;
+    state.panY += after.y - before.y;
+    clampPan();
+    applyViewBox();
   }
 
   /* オブジェクト中心をプリント範囲内にクランプ */
@@ -990,6 +1091,7 @@
       svg.addEventListener("pointermove", onPointerMove);
       svg.addEventListener("pointerup", onPointerUp);
       svg.addEventListener("pointercancel", onPointerUp);
+      svg.addEventListener("wheel", onWheel, { passive: false });
       document.addEventListener("keydown", onKeyDown);
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => render());
     },
@@ -1036,7 +1138,7 @@
     setZoom(z) { state.zoom = Math.max(0.5, Math.min(4, z)); applyViewBox(); },
     zoomIn() { Editor.setZoom(state.zoom * 1.25); },
     zoomOut() { Editor.setZoom(state.zoom / 1.25); },
-    zoomFit() { Editor.setZoom(1); },
+    zoomFit() { state.panX = 0; state.panY = 0; Editor.setZoom(1); },
     toggleGrid() { state.showGrid = !state.showGrid; render(); return state.showGrid; },
     togglePreview() {
       state.preview = !state.preview;

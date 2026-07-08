@@ -429,8 +429,21 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 
 /* ---------------- レスポンシブ ---------------- */
 @media (max-width: 1080px) {
-  .editor-layout { grid-template-columns: 64px 230px 1fr; }
-  .side-panel { display: none; }
+  /* レイヤー・エリア情報パネルは消さず、キャンバスの下に全幅で並べる
+   * （タブレット・スマホでも重ね順の入替と色数/実寸の確認ができるように） */
+  .editor-layout {
+    grid-template-columns: 64px 230px 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    height: auto; min-height: calc(100vh - 130px);
+  }
+  .toolrail { grid-row: 1 / 3; }
+  .toolpanel { grid-row: 1 / 3; }
+  .side-panel {
+    grid-column: 3; grid-row: 2;
+    border-left: none; border-top: 1px solid var(--line);
+    flex-direction: row; flex-wrap: wrap; gap: 20px;
+  }
+  .side-panel .side-box { flex: 1 1 240px; }
   .quote-layout { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
@@ -438,14 +451,16 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   .steps { order: 3; width: 100%; justify-content: center; margin-left: 0; }
   .steps li { padding: 5px 10px; font-size: 11px; }
   .editor-layout {
-    grid-template-columns: 1fr; grid-template-rows: auto auto minmax(320px, 1fr);
+    grid-template-columns: 1fr; grid-template-rows: auto auto minmax(320px, 1fr) auto;
     height: auto;
   }
-  .toolrail { flex-direction: row; padding: 0; overflow-x: auto; }
+  .toolrail { flex-direction: row; padding: 0; overflow-x: auto; grid-row: auto; }
   .toolrail button { flex: 1; border-left: none; border-bottom: 3px solid transparent; padding: 9px 2px; }
   .toolrail button.active { border-left: none; border-bottom-color: var(--accent); }
-  .toolpanel { max-height: 300px; border-right: none; border-bottom: 1px solid var(--line); }
+  .toolpanel { max-height: 300px; border-right: none; border-bottom: 1px solid var(--line); grid-row: auto; }
   .canvas-wrap { min-height: 340px; }
+  .side-panel { grid-column: 1; flex-direction: column; }
+  .contact-grid { grid-template-columns: 1fr; }
   .eb-total b { font-size: 19px; }
   .estimate-bar { padding: 8px 12px; }
 }
