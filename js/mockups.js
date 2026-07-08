@@ -205,5 +205,46 @@
     return renderMockup(product.mockup, colorHex, view);
   }
 
-  globalThis.Mockups = { renderMockup, renderProductMockup, shade };
+  /* ---------------- 着用イメージ（背景＋トルソー） ----------------
+   * 商品の「後ろ」に置く、スタジオ背景と首・肩のマネキン形。
+   * アパレルは着用感、キャップは頭にかぶせた感じを演出します。 */
+
+  const WEARABLE = { tshirt: 1, drytshirt: 1, polo: 1, hoodie: 1, cap: 1 };
+
+  function wornBackdrop(product, view) {
+    const bg = `
+      <defs>
+        <radialGradient id="wbg" cx="50%" cy="38%" r="75%">
+          <stop offset="0%" stop-color="#f3efe9"/>
+          <stop offset="60%" stop-color="#e7e1d8"/>
+          <stop offset="100%" stop-color="#d5cec3"/>
+        </radialGradient>
+      </defs>
+      <rect x="0" y="0" width="700" height="760" fill="url(#wbg)"/>
+      <ellipse cx="350" cy="690" rx="250" ry="30" fill="rgba(40,34,26,0.13)"/>`;
+
+    const skin = "#e9cbaa", skinSh = "#d3ad84";
+    let form = "";
+    const mk = product.mockup;
+
+    if (mk === "cap") {
+      /* 頭にかぶせたイメージ：頭部シルエット＋首 */
+      form = `
+        <ellipse cx="350" cy="300" rx="120" ry="140" fill="${skin}"/>
+        <path d="M250 360 Q350 470 450 360 L450 470 L250 470 Z" fill="${skin}"/>
+        <ellipse cx="350" cy="300" rx="120" ry="140" fill="none" stroke="${skinSh}" stroke-width="2" opacity=".5"/>`;
+    } else if (WEARABLE[mk]) {
+      /* 首＋肩のトルソー（頭は写さないマネキン風） */
+      const neckTop = view === "back" ? 150 : 138;
+      form = `
+        <path d="M300 ${neckTop} Q300 210 322 236 L378 236 Q400 210 400 ${neckTop} Q392 120 350 120 Q308 120 300 ${neckTop} Z" fill="${skin}"/>
+        <path d="M322 236 L378 236 Q372 250 350 252 Q328 250 322 236 Z" fill="${skinSh}" opacity=".6"/>
+        <path d="M150 300 Q250 250 350 250 Q450 250 550 300 L560 360 Q350 300 140 360 Z" fill="${skin}" opacity=".9"/>`;
+    }
+    return `<g class="worn-back" pointer-events="none">${bg}${form}</g>`;
+  }
+
+  function isWearable(product) { return !!(product && WEARABLE[product.mockup]); }
+
+  globalThis.Mockups = { renderMockup, renderProductMockup, wornBackdrop, isWearable, shade };
 })();

@@ -78,7 +78,15 @@
     $("#btnZoomOut").addEventListener("click", () => Editor.zoomOut());
     $("#btnZoomFit").addEventListener("click", () => Editor.zoomFit());
     $("#btnGrid").addEventListener("click", (e) => e.currentTarget.classList.toggle("on", Editor.toggleGrid()));
-    $("#btnPreview").addEventListener("click", (e) => e.currentTarget.classList.toggle("on", Editor.togglePreview()));
+    $("#btnPreview").addEventListener("click", (e) => {
+      const on = Editor.togglePreview();
+      e.currentTarget.classList.toggle("on", on);
+    });
+    $("#btnWorn").addEventListener("click", (e) => {
+      const on = Editor.toggleWorn();
+      e.currentTarget.classList.toggle("on", on);
+      $("#btnPreview").classList.toggle("on", Editor.state.preview);
+    });
     $("#btnFullPreview").addEventListener("click", showFullPreview);
     $("#fullPreview").addEventListener("click", (e) => { if (e.target.id === "fullPreview") e.currentTarget.hidden = true; });
 

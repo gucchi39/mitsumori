@@ -26,7 +26,11 @@
     panY: 0,
     showGrid: false,
     preview: false,
+    worn: false,            // 着用イメージ（背景＋トルソー）表示
   };
+
+  let realismOn = true;     // リアル質感フィルタ（入稿書き出し時のみ false）
+  let interacting = false;  // ドラッグ中は重いフィルタを外す（タブレットで滑らかに＆当たり判定を正確に）
 
   let undoStack = [];
   let redoStack = [];
@@ -302,17 +306,53 @@
     return (VB_W / state.zoom) / rect.width;
   }
 
+  /* リアル表示用フィルタ（画面・プレビューのみ。入稿データには適用しない）
+   * ・fxEmb   刺繍：立体ステッチ（ハイライト＋微細ノイズ＋落ち影）
+   * ・fxInk   プリント：生地に乗った質感（ごく僅かな歪み＋柔らか影）
+   * ・fxGarment 商品：写真のような落ち影で立体感 */
+  const FX_DEFS = `
+    <filter id="fxEmb" x="-25%" y="-25%" width="150%" height="150%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1.1" result="b"/>
+      <feSpecularLighting in="b" surfaceScale="2.2" specularConstant="0.85" specularExponent="16" lighting-color="#ffffff" result="s">
+        <feDistantLight azimuth="235" elevation="58"/>
+      </feSpecularLighting>
+      <feComposite in="s" in2="SourceAlpha" operator="in" result="sc"/>
+      <feTurbulence type="turbulence" baseFrequency="0.85 0.045" numOctaves="2" seed="7" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.16 0" result="st"/>
+      <feComposite in="st" in2="SourceAlpha" operator="in" result="stc"/>
+      <feMerge result="m"><feMergeNode in="SourceGraphic"/><feMergeNode in="sc"/><feMergeNode in="stc"/></feMerge>
+      <feDropShadow dx="0" dy="1.1" stdDeviation="0.9" flood-color="#000" flood-opacity="0.38"/>
+    </filter>
+    <filter id="fxInk" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="4" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="0.7" result="d"/>
+      <feDropShadow in="d" dx="0" dy="0.5" stdDeviation="0.4" flood-color="#000" flood-opacity="0.13"/>
+    </filter>
+    <filter id="fxGarment" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#1a2036" flood-opacity="0.20"/>
+    </filter>`;
+
+  function methodFilter(methodId) {
+    if (methodId === "embroidery") return "fxEmb";
+    return "fxInk"; // silk / inkjet
+  }
+
   function render() {
     if (!svg || !state.product) return;
     const area = currentArea();
     const view = area ? area.view : "front";
     const areasInView = state.product.printAreas.filter((a) => a.view === view);
+    const fx = realismOn && !interacting; // 入稿書き出し・ドラッグ中は無効
 
-    const defs = areasInView
+    const clipDefs = areasInView
       .map((a) => `<clipPath id="clip-${a.id}"><rect x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}"/></clipPath>`)
       .join("");
+    const defs = clipDefs + (fx ? FX_DEFS : "");
 
-    const mockup = Mockups.renderProductMockup(state.product, bodyHex(), state.colorId, view);
+    /* 着用イメージ：商品の背後にスタジオ背景＋トルソー */
+    const backdrop = fx && state.worn ? Mockups.wornBackdrop(state.product, view) : "";
+    const rawMockup = Mockups.renderProductMockup(state.product, bodyHex(), state.colorId, view);
+    const mockup = fx ? `<g filter="url(#fxGarment)">${rawMockup}</g>` : rawMockup;
 
     let gridMarkup = "";
     if (state.showGrid && !state.preview) {
@@ -338,17 +378,19 @@
         .join("");
     }
 
-    /* オブジェクト（同じビューの他の位置のデザインも表示する） */
+    /* オブジェクト（同じビューの他の位置のデザインも表示する）。
+     * 加工方法ごとのリアル質感フィルタを位置グループ単位で適用（画面のみ）。 */
     const objectsMarkup = areasInView
       .map((a) => {
         const d = state.designs[a.id];
         if (!d || !d.objects.length) return "";
         const editable = area && a.id === area.id;
-        return `<g clip-path="url(#clip-${a.id})">${d.objects.map((o) => objMarkup(o, editable)).join("")}</g>`;
+        const filt = fx ? ` filter="url(#${methodFilter(d.methodId)})"` : "";
+        return `<g clip-path="url(#clip-${a.id})"><g${filt}>${d.objects.map((o) => objMarkup(o, editable)).join("")}</g></g>`;
       })
       .join("");
 
-    svg.innerHTML = `<defs>${defs}</defs>${mockup}${gridMarkup}<g id="objectLayer">${objectsMarkup}</g>${areaMarkup}<g id="selLayer"></g>`;
+    svg.innerHTML = `<defs>${defs}</defs>${backdrop}${mockup}${gridMarkup}<g id="objectLayer">${objectsMarkup}</g>${areaMarkup}<g id="selLayer"></g>`;
     applyViewBox();
     renderSelection();
   }
@@ -503,6 +545,7 @@
     const o = drag.obj;
     const area = currentArea();
     drag.moved = true; // 実際に動いた場合のみ履歴に積む（選択クリックでは積まない）
+    interacting = true; // ドラッグ中はフィルタを外して軽く描画
 
     if (drag.mode === "move") {
       let nx = drag.origX + (pt.x - drag.startPt.x);
@@ -542,8 +585,11 @@
     const d = drag;
     drag = null;
     dragGuides.v = dragGuides.h = false;
+    const wasInteracting = interacting;
+    interacting = false; // フィルタを戻す（この後の render/commit で仕上がり表示に戻る）
 
     if (d.mode === "pan") {
+      if (wasInteracting) render();
       /* 動かさず離した＝空クリック → 選択解除 */
       if (!d.moved && state.selectedId) {
         state.selectedId = null;
@@ -555,7 +601,8 @@
 
     /* 単なる選択クリック（未移動）では commit しない
      * → redo履歴の破棄・無変更スナップショットの蓄積を防ぐ */
-    if (d.moved) commit();
+    if (d.moved) commit(); // commit() が render() を呼び、フィルタ復帰
+    else if (wasInteracting) render();
     callbacks.onSelect(selectedObj());
   }
 
@@ -1038,9 +1085,11 @@
   /** 指定ビュー（省略時は現在ビュー）をスタンドアロンSVG文字列として書き出し。
    *  embedFont=false（ラスタライズ用）は @import を省く。
    *  transparent=true は白背景を入れない（インライン合成プレビュー用）。 */
-  function exportSVG(view, embedFont, transparent) {
+  function exportSVG(view, embedFont, transparent, realism) {
     const savedArea = state.areaId;
     const wasPreview = state.preview;
+    const wasRealism = realismOn;
+    realismOn = !!realism; // 入稿/DL用は false（クリーンなベクター）、プレビューは true
     if (view) {
       const target = state.product.printAreas.find((a) => a.view === view);
       if (target) state.areaId = target.id;
@@ -1057,13 +1106,14 @@
       fontStyle + bg + svg.innerHTML + `</svg>`;
     state.preview = wasPreview;
     state.areaId = savedArea;
+    realismOn = wasRealism;
     render();
     return markup;
   }
 
-  /** 全面プレビュー用：ライブDOMに差し込むSVGマークアップ（ページ側のフォントで正しく表示） */
+  /** 全面プレビュー用：ライブDOMに差し込むSVGマークアップ（リアル質感ON・ページ側フォント） */
   function previewSVG(view) {
-    return exportSVG(view, false, false);
+    return exportSVG(view, false, false, true);
   }
 
   function exportPNG(scale, view) {
@@ -1157,6 +1207,14 @@
       callbacks.onSelect(null);
       return state.preview;
     },
+    toggleWorn() {
+      state.worn = !state.worn;
+      if (state.worn) { state.preview = true; state.selectedId = null; } // 着用は仕上がり表示に
+      render();
+      callbacks.onSelect(null);
+      return state.worn;
+    },
+    get worn() { return state.worn; },
 
     addText, addStamp, addImage,
     updateSelected, deleteSelected, reorderSelected, selectObject,
