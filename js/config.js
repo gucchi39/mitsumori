@@ -200,6 +200,12 @@ const PRODUCTS = [
     category: "Tシャツ",
     basePrice: 890,
     note: "綿100%・ヘビーウェイト。イベント・チームウェアの定番。",
+    /* 実際の商品写真を使う場合は photos を設定（無ければイラスト表示）:
+     *   photos: { front: "assets/products/tshirt_front.png", back: "assets/products/tshirt_back.png" },
+     * 色ごとに写真を分ける場合（キーはカラーID）:
+     *   photos: { white: { front: "...", back: "..." }, black: { front: "...", back: "..." } },
+     * ※ 写真は 700×760 の枠に自動フィットします。printAreas の位置と合うよう
+     *    正面からの平置き/トルソー写真を推奨。 */
     sizes: ["S", "M", "L", "XL", "XXL"],
     sizeSurcharge: { XXL: 110 },
     colors: pick("white", "black", "navy", "red", "royal", "daisy", "forest", "gray", "burgundy", "pink"),

@@ -83,6 +83,7 @@
           <div class="ct-group">
             <button id="btnGrid" title="グリッド表示">⊞ グリッド</button>
             <button id="btnPreview" title="仕上がりプレビュー">👁 仕上がり</button>
+            <button id="btnFullPreview" title="前面・背面をまとめて確認">🔍 全面</button>
           </div>
           <div class="ct-group sel-actions" id="selActions" hidden>
             <button id="saDup" title="複製（Ctrl+D）">⧉ 複製</button>
@@ -206,6 +207,11 @@
 <!-- ============ 注文完了オーバーレイ ============ -->
 <div id="orderComplete" class="order-complete" hidden>
   <div class="oc-card"><div class="oc-inner"></div></div>
+</div>
+
+<!-- ============ 全面プレビュー ============ -->
+<div id="fullPreview" class="order-complete" hidden>
+  <div class="oc-card fp-card"><div class="fp-inner"></div></div>
 </div>
 
 <div id="toastBox" class="toast-box" aria-live="polite"></div>

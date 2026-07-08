@@ -179,5 +179,31 @@
     return `<g class="mockup">${fn(colorHex, view || "front")}</g>`;
   }
 
-  globalThis.Mockups = { renderMockup, shade };
+  /* ---------------- 実写真モックアップ ----------------
+   * config.js の PRODUCTS に photos を設定すると、イラストの代わりに
+   * 実際の商品写真を表示できます（700×760の枠に収まるよう自動フィット）。
+   *   photos: { front: "assets/products/tshirt_front.png", back: "..." }
+   * 色ごとに写真を分ける場合:
+   *   photos: { white: { front: "...", back: "..." }, black: { ... } }
+   * 該当する写真が無い色・面は、自動的にイラストにフォールバックします。 */
+
+  function photoFor(product, colorId, view) {
+    const ph = product && product.photos;
+    if (!ph) return null;
+    const set = ph[colorId] && typeof ph[colorId] === "object" ? ph[colorId] : ph;
+    const url = set[view] || set.front;
+    return typeof url === "string" && url ? url : null;
+  }
+
+  /** 商品のモックアップ（写真があれば写真、なければイラスト） */
+  function renderProductMockup(product, colorHex, colorId, view) {
+    const url = photoFor(product, colorId, view || "front");
+    if (url) {
+      const e = String(url).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+      return `<g class="mockup"><image href="${e}" xlink:href="${e}" x="0" y="0" width="700" height="760" preserveAspectRatio="xMidYMid meet"/></g>`;
+    }
+    return renderMockup(product.mockup, colorHex, view);
+  }
+
+  globalThis.Mockups = { renderMockup, renderProductMockup, shade };
 })();

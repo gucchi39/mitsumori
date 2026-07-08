@@ -312,7 +312,7 @@
       .map((a) => `<clipPath id="clip-${a.id}"><rect x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}"/></clipPath>`)
       .join("");
 
-    const mockup = Mockups.renderMockup(state.product.mockup, bodyHex(), view);
+    const mockup = Mockups.renderProductMockup(state.product, bodyHex(), state.colorId, view);
 
     let gridMarkup = "";
     if (state.showGrid && !state.preview) {
@@ -985,12 +985,14 @@
 
   /** 入稿用SVG：商品イラスト・白背景を含まず、指定プリント位置のアートワークのみを
    *  実寸(mm)・原寸viewBoxで書き出す。Illustratorでそのまま原寸配置できる。 */
-  function exportProductionSVG(areaId) {
+  function exportProductionSVG(areaId, embedFont) {
     const a = state.product.printAreas.find((x) => x.id === areaId);
     const d = state.designs[areaId];
     if (!a || !d || !d.objects.length) return "";
     const cid = "cut";
-    const fontStyle = FONT_IMPORT_URL ? `<style type="text/css">@import url("${FONT_IMPORT_URL}");</style>` : "";
+    /* @import はダウンロードSVGのみ（<img>ラスタライズ時は secure static mode で
+     * 外部参照が読めず画像自体が壊れるため embedFont=false で省く） */
+    const fontStyle = embedFont !== false && FONT_IMPORT_URL ? `<style type="text/css">@import url("${FONT_IMPORT_URL}");</style>` : "";
     const body = d.objects.map((o) => objMarkup(o, false)).join("");
     /* 背景は透過（白ベタを入れない＝濃色ボディに白い四角が刷られない）。
      * viewBox はプリント範囲そのもの、width/height は実寸mm。 */
@@ -1006,7 +1008,7 @@
     return new Promise((resolve, reject) => {
       const a = state.product.printAreas.find((x) => x.id === areaId);
       if (!a) return reject(new Error("area not found"));
-      const markup = exportProductionSVG(areaId);
+      const markup = exportProductionSVG(areaId, false); // ラスタライズ用は@import無し
       if (!markup) return reject(new Error("empty"));
       const blob = new Blob([markup], { type: "image/svg+xml;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -1033,8 +1035,10 @@
     return a ? { id: a.id, name: a.name, view: a.view, mmW: a.mmW, mmH: a.mmH } : null;
   }
 
-  /** 指定ビュー（省略時は現在ビュー）をスタンドアロンSVG文字列として書き出し */
-  function exportSVG(view) {
+  /** 指定ビュー（省略時は現在ビュー）をスタンドアロンSVG文字列として書き出し。
+   *  embedFont=false（ラスタライズ用）は @import を省く。
+   *  transparent=true は白背景を入れない（インライン合成プレビュー用）。 */
+  function exportSVG(view, embedFont, transparent) {
     const savedArea = state.areaId;
     const wasPreview = state.preview;
     if (view) {
@@ -1044,21 +1048,27 @@
     state.preview = true;
     render();
     /* Web フォントの @import を埋め込み、ブラウザで開いた際に書体が再現されるようにする
-     * （Illustrator 等フォント未所持の環境では代替書体になるため、確定入稿はアウトライン化推奨） */
-    const fontStyle = FONT_IMPORT_URL
+     * （<img>でラスタライズする用途では embedFont=false にして外部参照を外す） */
+    const fontStyle = embedFont !== false && FONT_IMPORT_URL
       ? `<defs><style type="text/css">@import url("${FONT_IMPORT_URL}");</style></defs>`
       : "";
+    const bg = transparent ? "" : `<rect width="${VB_W}" height="${VB_H}" fill="#ffffff"/>`;
     const markup = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${VB_W} ${VB_H}" width="${VB_W}" height="${VB_H}">` +
-      fontStyle + `<rect width="${VB_W}" height="${VB_H}" fill="#ffffff"/>` + svg.innerHTML + `</svg>`;
+      fontStyle + bg + svg.innerHTML + `</svg>`;
     state.preview = wasPreview;
     state.areaId = savedArea;
     render();
     return markup;
   }
 
+  /** 全面プレビュー用：ライブDOMに差し込むSVGマークアップ（ページ側のフォントで正しく表示） */
+  function previewSVG(view) {
+    return exportSVG(view, false, false);
+  }
+
   function exportPNG(scale, view) {
     return new Promise((resolve, reject) => {
-      const markup = exportSVG(view);
+      const markup = exportSVG(view, false); // ラスタライズ用は@import無し
       const blob = new Blob([markup], { type: "image/svg+xml;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const img = new Image();
@@ -1153,7 +1163,7 @@
     duplicateSelected, centerSelected, flipSelected,
     applyTemplate, templateThumbSVG,
     undo, redo,
-    getPlacements, areaThumbSVG, exportSVG, exportPNG, designViews,
+    getPlacements, areaThumbSVG, exportSVG, exportPNG, previewSVG, designViews,
     designAreas, exportProductionSVG, exportProductionPNG, areaMeta,
 
     get state() { return state; },

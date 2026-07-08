@@ -79,6 +79,8 @@
     $("#btnZoomFit").addEventListener("click", () => Editor.zoomFit());
     $("#btnGrid").addEventListener("click", (e) => e.currentTarget.classList.toggle("on", Editor.toggleGrid()));
     $("#btnPreview").addEventListener("click", (e) => e.currentTarget.classList.toggle("on", Editor.togglePreview()));
+    $("#btnFullPreview").addEventListener("click", showFullPreview);
+    $("#fullPreview").addEventListener("click", (e) => { if (e.target.id === "fullPreview") e.currentTarget.hidden = true; });
 
     /* 選択オブジェクトの操作バー */
     $("#saDup").addEventListener("click", () => Editor.duplicateSelected());
@@ -162,7 +164,7 @@
       card.className = "product-card";
       const methods = p.methods.map((m) => `<span class="pc-badge">${METHODS[m].short}</span>`).join("");
       card.innerHTML = `
-        <svg viewBox="40 70 620 620">${Mockups.renderMockup(p.mockup, p.colors[0].hex, "front")}</svg>
+        <svg viewBox="40 70 620 620">${Mockups.renderProductMockup(p, p.colors[0].hex, p.colors[0].id, "front")}</svg>
         <span class="pc-cat">${p.category}</span>
         <div class="pc-name">${p.name}</div>
         <div class="pc-price"><b>¥${p.basePrice.toLocaleString()}</b> /枚〜（税抜・無地）</div>
@@ -935,6 +937,41 @@
         if (items.length > 1) toast(`${items.length}面のPNGを書き出しました`);
       })
       .catch(() => alert("PNGの生成に失敗しました。SVG形式をお試しください。"));
+  }
+
+  /* ================= 全面プレビュー ================= */
+
+  /* 前面・背面などデザインのある全ビューを1画面に並べて確認するモーダル。
+   * SVGをライブDOMに直接差し込む（ページ側のフォントで正しく表示される。
+   * <img>化すると secure static mode でフォントが壊れるため）。 */
+  function showFullPreview() {
+    const p = Editor.state.product;
+    if (!p) return;
+    const views = Editor.designViews();
+    const list = views.length ? views : ["front"];
+    const placements = Editor.getPlacements();
+    const color = p.colors.find((c) => c.id === Editor.state.colorId);
+    const el = $("#fullPreview");
+
+    const panels = list.map((v) => {
+      const meta = placements
+        .filter((pl) => pl.view === v)
+        .map((pl) => `${escapeHtml(pl.areaName)}：${methodOf(pl.methodId).short}・${pl.hasImage ? "フルカラー" : pl.colorCount + "色"}・約${(pl.widthMm / 10).toFixed(1)}×${(pl.heightMm / 10).toFixed(1)}cm`)
+        .join("<br>");
+      return `<figure class="fp-fig">
+        <div class="fp-svg">${Editor.previewSVG(v)}</div>
+        <figcaption><b>${VIEW_LABEL[v] || v}</b><br><span>${meta || "デザインなし"}</span></figcaption>
+      </figure>`;
+    }).join("");
+
+    el.querySelector(".fp-inner").innerHTML = `
+      <h2>🔍 仕上がりプレビュー（全面）</h2>
+      <p class="fp-sub">${escapeHtml(p.name)}／カラー：${escapeHtml(color ? color.name : "-")}</p>
+      <div class="fp-grid">${panels}</div>
+      <p class="fp-note">※ 画面の色はsRGB表示です。実際のインク・糸の色味とは多少異なる場合があります。</p>
+      <button class="primary-btn" id="fpClose">閉じる</button>`;
+    el.hidden = false;
+    $("#fpClose").addEventListener("click", () => { el.hidden = true; });
   }
 
   /* ================= 入稿データ（製造用） ================= */

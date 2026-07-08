@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>開業前チェック｜ミツモリ デザインシミュレーター</title>
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧰</text></svg>">
+<style>
+  :root{--accent:#ff6a13;--accent-dark:#e05a08;--ok:#1d9a5b;--warn:#b26a00;--err:#c8353c;
+    --ink:#232a35;--sub:#6b7686;--line:#e2e6ee;--bg:#f4f6f9;--panel:#fff}
+  @media (prefers-color-scheme:dark){:root{--ink:#e9edf3;--sub:#9aa4b2;--line:#2c3440;--bg:#161a21;--panel:#1e232c}}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:"Noto Sans JP","Hiragino Kaku Gothic ProN",sans-serif;color:var(--ink);background:var(--bg);line-height:1.8;padding-bottom:60px}
+  .wrap{max-width:860px;margin:0 auto;padding:0 20px}
+  header{background:linear-gradient(135deg,#2b2f36,#454c58);color:#fff;padding:30px 0}
+  header h1{font-size:22px}
+  header p{font-size:12.5px;opacity:.85;margin-top:4px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 24px;margin:20px 0;box-shadow:0 2px 10px rgba(25,35,55,.06)}
+  h2{font-size:17px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  h2 .step{background:var(--accent);color:#fff;width:26px;height:26px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 auto}
+  p,li{font-size:13.5px}
+  ol{margin:8px 0 8px 22px}
+  li{margin:5px 0}
+  code{font-family:Consolas,monospace;background:rgba(127,127,127,.15);padding:1px 6px;border-radius:5px;font-size:.9em}
+  pre{background:rgba(127,127,127,.08);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto;font-size:12.5px;margin:8px 0}
+  .checks{list-style:none;margin:8px 0 0}
+  .checks li{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border:1px solid var(--line);border-radius:8px;margin:8px 0;font-size:13.5px}
+  .checks .mark{font-size:16px;flex:0 0 auto}
+  .ok{border-color:#bfe3cf}.ok .mark{color:var(--ok)}
+  .warn{border-color:#ecd39a;background:rgba(240,200,100,.07)}.warn .mark{color:var(--warn)}
+  .err{border-color:#ecb0b4;background:rgba(230,80,90,.06)}.err .mark{color:var(--err)}
+  .btn{background:var(--accent);color:#fff;border:none;border-radius:9px;padding:11px 22px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+  .btn:disabled{background:#aab2bd;cursor:not-allowed}
+  .btn.ghost{background:var(--panel);color:var(--ink);border:1px solid var(--line)}
+  #testResult{margin-top:12px;font-size:13.5px}
+  .badge{display:inline-block;font-size:11px;font-weight:700;border-radius:5px;padding:2px 8px;margin-left:6px}
+  .badge.on{background:#e2f4e9;color:var(--ok)} .badge.off{background:#fdeeee;color:var(--err)}
+  a{color:var(--accent-dark)}
+  .back{display:inline-block;margin-top:16px;font-weight:700;text-decoration:none;font-size:13px}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <h1>🧰 開業前チェック（店舗運営者向け）</h1>
+  <p>注文を受け始める前に、このページで設定の不足を確認できます。このページはお客様には案内不要です。</p>
+</div></header>
+<div class="wrap">
+
+  <section>
+    <h2><span class="step">1</span>設定の自動診断</h2>
+    <p>現在の <code>js/config.js</code> を読み取って診断しています。⚠・✕の項目を解消してから公開してください。</p>
+    <ul class="checks" id="checkList"><li>診断中…</li></ul>
+  </section>
+
+  <section>
+    <h2><span class="step">2</span>注文の自動受信を設定する（推奨）</h2>
+    <p>いまは <b id="modeLabel">—</b> で動作しています。外部フォームサービスを設定すると、お客様の端末環境に関係なく<b>注文＋入稿データが自動で貴社に届きます</b>（無料枠で開始可能）。</p>
+    <h3 style="font-size:14px;margin:14px 0 4px">Formspree の場合（かんたん・推奨）</h3>
+    <ol>
+      <li><a href="https://formspree.io" target="_blank" rel="noopener">formspree.io</a> でアカウント登録（受信したいメールアドレスで）</li>
+      <li>「New form」でフォームを作成 → <b>エンドポイントURL</b>（例 <code>https://formspree.io/f/abcdwxyz</code>）をコピー</li>
+      <li><code>js/config.js</code> の <code>ORDER</code> を書き換え：
+<pre>const ORDER = {
+  provider: "formspree",
+  endpoint: "https://formspree.io/f/abcdwxyz", // ←コピーしたURL
+  toEmail: "貴社の受信メール@example.com",
+  attachFiles: true,
+  autoNumber: "ORD",
+};</pre></li>
+      <li>保存してサイトを更新（GitHubへプッシュ）</li>
+      <li>下の「テスト送信」ボタンで届くか確認</li>
+    </ol>
+    <h3 style="font-size:14px;margin:14px 0 4px">Web3Forms の場合</h3>
+    <ol>
+      <li><a href="https://web3forms.com" target="_blank" rel="noopener">web3forms.com</a> でメールを入れて <b>Access Key</b> を取得</li>
+      <li><code>provider: "web3forms"</code>、<code>endpoint: "https://api.web3forms.com/submit"</code>、<code>accessKey: "取得したキー"</code> を設定</li>
+    </ol>
+    <p style="font-size:12px;color:var(--sub)">※ 無料枠は月間送信数・添付容量に上限があります。写真入り注文が多い場合は有料プランをご検討ください。</p>
+  </section>
+
+  <section>
+    <h2><span class="step">3</span>受信テスト</h2>
+    <p>設定したエンドポイントへテスト注文を送ります。数分以内に受信メールが届けば成功です。</p>
+    <button class="btn" id="btnTest">📨 テスト送信</button>
+    <div id="testResult"></div>
+  </section>
+
+  <section>
+    <h2><span class="step">4</span>公開前の最終チェック（手動）</h2>
+    <ul class="checks">
+      <li class="warn"><span class="mark">☐</span><span><b>価格表</b>：<code>js/config.js</code> の商品単価・加工賃・版代/型代を貴社の実価格に更新した</span></li>
+      <li class="warn"><span class="mark">☐</span><span><b>特商法ページ</b>：<a href="terms.html" target="_blank">docs/terms.html</a> の事業者情報・返品条件を実在の内容に更新した</span></li>
+      <li class="warn"><span class="mark">☐</span><span><b>糸・インクの色番</b>：<code>THREAD_COLORS</code> / <code>INK_COLORS</code> の <code>code</code> に貴社使用の糸番手・指定色を記入した（入稿指示書に出ます）</span></li>
+      <li class="warn"><span class="mark">☐</span><span><b>実機確認</b>：スマホで商品選択→デザイン→注文まで一度通した</span></li>
+    </ul>
+    <a class="back" href="../index.html">← シミュレーターへ</a>　<a class="back" href="manual.html">📖 マニュアル</a>
+  </section>
+
+</div>
+
+<script src="../js/config.js"></script>
+<script>
+(function(){
+  "use strict";
+  const list = document.getElementById("checkList");
+  const items = [];
+  const esc = (s) => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  function add(level, label, detail){ items.push({level, label, detail}); }
+
+  const C = globalThis.CONFIG || {};
+  const SHOP = C.SHOP || {}, LEGAL = C.LEGAL || {}, ORDER = C.ORDER || {};
+  const isPlaceholder = (v) => !v || /example\.com|0000-00-0000|000-0000|○○|山田 太郎/.test(String(v));
+
+  /* 店舗情報 */
+  add(isPlaceholder(SHOP.email) ? "err" : "ok", "店舗メールアドレス", isPlaceholder(SHOP.email) ? `プレースホルダーのままです（${esc(SHOP.email||"未設定")}）。SHOP.email を実際の受信メールへ。` : esc(SHOP.email));
+  add(isPlaceholder(SHOP.tel) ? "warn" : "ok", "店舗電話番号", isPlaceholder(SHOP.tel) ? "SHOP.tel がサンプルのままです。" : esc(SHOP.tel));
+  add(isPlaceholder(SHOP.address) ? "warn" : "ok", "店舗住所", isPlaceholder(SHOP.address) ? "SHOP.address がサンプルのままです。" : "設定済み");
+
+  /* 特商法 */
+  const legalBad = isPlaceholder(LEGAL.seller) || isPlaceholder(LEGAL.address) || isPlaceholder(LEGAL.tel) || isPlaceholder(LEGAL.email) || isPlaceholder(LEGAL.manager);
+  add(legalBad ? "err" : "ok", "特定商取引法の表記（法的必須）", legalBad ? "LEGAL の事業者情報がサンプルのままです。注文受付開始前に必ず実在情報へ（docs/terms.html も同様）。" : "設定済み");
+
+  /* 受信設定 */
+  const hasEndpoint = ORDER.endpoint && ORDER.provider && ORDER.provider !== "mailto";
+  add(hasEndpoint ? "ok" : "warn", "注文の自動受信（フォームPOST）",
+    hasEndpoint ? `${esc(ORDER.provider)} / ${esc(ORDER.endpoint)}` :
+    "未設定のため「メール方式」で動作します（お客様のメールソフト依存・添付は手動DL）。下の手順2で設定を推奨。");
+  if (ORDER.provider === "web3forms" && !ORDER.accessKey) add("err", "Web3Forms の accessKey", "provider が web3forms ですが accessKey が空です。");
+  add(isPlaceholder(ORDER.toEmail) ? "warn" : "ok", "フォールバック送信先メール", isPlaceholder(ORDER.toEmail) ? "ORDER.toEmail がサンプルのままです。" : esc(ORDER.toEmail));
+
+  /* 色コード */
+  const th = (C.THREAD_COLORS||[]).filter(c=>!c.code).length;
+  const ink = (C.INK_COLORS||[]).filter(c=>!c.code).length;
+  add(th+ink>0 ? "warn" : "ok", "糸番手・インク指定色コード",
+    th+ink>0 ? `未記入：刺繍糸 ${th}色 / インク ${ink}色。入稿指示書には色名のみ出力されます（運用上は任意）。` : "全色設定済み");
+
+  const modeLabel = document.getElementById("modeLabel");
+  modeLabel.textContent = hasEndpoint ? `自動受信（${ORDER.provider}）` : "メール方式（mailto）";
+  modeLabel.insertAdjacentHTML("afterend", hasEndpoint ? ' <span class="badge on">自動受信ON</span>' : ' <span class="badge off">未設定</span>');
+
+  list.innerHTML = items.map(i =>
+    `<li class="${i.level}"><span class="mark">${i.level==="ok"?"✅":i.level==="warn"?"⚠":"✕"}</span><span><b>${i.label}</b><br><span style="color:var(--sub);font-size:12.5px">${i.detail}</span></span></li>`).join("");
+
+  /* テスト送信 */
+  const btn = document.getElementById("btnTest");
+  const out = document.getElementById("testResult");
+  btn.addEventListener("click", async () => {
+    if (!hasEndpoint) {
+      out.innerHTML = '<span style="color:var(--warn)">⚠ エンドポイント未設定のためテストできません。メール方式で運用する場合、このテストは不要です。</span>';
+      return;
+    }
+    btn.disabled = true; btn.textContent = "送信中…";
+    try {
+      const fd = new FormData();
+      fd.append("orderNo", "TEST-" + Math.floor(Math.random()*9000+1000));
+      fd.append("subject", "【テスト送信】デザインシミュレーター受信確認");
+      fd.append("message", "これは開業前チェックページからのテスト送信です。受信できていれば設定は正常です。");
+      fd.append("email", ORDER.toEmail || SHOP.email || "");
+      if (ORDER.provider === "web3forms" && ORDER.accessKey) fd.append("access_key", ORDER.accessKey);
+      const res = await fetch(ORDER.endpoint, { method: "POST", body: fd, headers: { Accept: "application/json" } });
+      out.innerHTML = res.ok
+        ? '<span style="color:var(--ok)">✅ 送信成功。受信メールボックスをご確認ください。</span>'
+        : `<span style="color:var(--err)">✕ 送信失敗（HTTP ${res.status}）。エンドポイントURL・プラン制限をご確認ください。</span>`;
+    } catch (e) {
+      out.innerHTML = '<span style="color:var(--err)">✕ 送信エラー（ネットワーク/CORS）。URLが正しいかご確認ください。</span>';
+    }
+    btn.disabled = false; btn.textContent = "📨 テスト送信";
+  });
+})();
+</script>
+</body>
+</html>
