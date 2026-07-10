@@ -104,7 +104,7 @@
   /* designs 全体を無害化。未知の methodId は先頭の対応方法へ寄せる */
   function sanitizeDesigns(rawDesigns, product) {
     const clean = {};
-    const validAreas = new Set(product.printAreas.map((a) => a.id));
+    const validAreas = new Set([...(product.printAreas||[]), ...(product.photoAreas||[])].map((a) => a.id));
     for (const [areaId, d] of Object.entries(rawDesigns || {})) {
       if (!validAreas.has(areaId) || !d || typeof d !== "object") continue;
       const methodId = product.methods.includes(d.methodId) ? d.methodId : product.methods[0];
@@ -114,9 +114,18 @@
     return clean;
   }
 
+  /* 実効プリント範囲：写真モックアップ使用時に photoAreas があればそちらを使う
+   * （写真の胸・背中の位置に合わせて版面を配置できる）。無ければ通常の printAreas。 */
+  function productAreas(p) {
+    p = p || state.product;
+    if (!p) return [];
+    if (p.photoAreas && p.photos && p.photoAreas.length) return p.photoAreas;
+    return p.printAreas;
+  }
+
   function currentArea() {
     if (!state.product) return null;
-    return state.product.printAreas.find((a) => a.id === state.areaId) || null;
+    return productAreas().find((a) => a.id === state.areaId) || null;
   }
 
   function design(areaId) {
@@ -341,7 +350,7 @@
     if (!svg || !state.product) return;
     const area = currentArea();
     const view = area ? area.view : "front";
-    const areasInView = state.product.printAreas.filter((a) => a.view === view);
+    const areasInView = productAreas().filter((a) => a.view === view);
     const fx = realismOn && !interacting; // 入稿書き出し・ドラッグ中は無効
 
     const clipDefs = areasInView
@@ -866,7 +875,7 @@
   function getPlacementsInner() {
     const savedArea = state.areaId;
     const result = [];
-    for (const a of state.product.printAreas) {
+    for (const a of productAreas()) {
       const d = state.designs[a.id];
       if (!d || !d.objects.length) continue;
 
@@ -1015,7 +1024,7 @@
   function designViews() {
     if (!state.product) return [];
     const views = [];
-    for (const a of state.product.printAreas) {
+    for (const a of productAreas()) {
       const d = state.designs[a.id];
       if (d && d.objects.length && !views.includes(a.view)) views.push(a.view);
     }
@@ -1025,7 +1034,7 @@
   /** デザインが存在するプリント位置のID配列（商品順） */
   function designAreas() {
     if (!state.product) return [];
-    return state.product.printAreas
+    return productAreas()
       .filter((a) => { const d = state.designs[a.id]; return d && d.objects.length; })
       .map((a) => a.id);
   }
@@ -1033,7 +1042,7 @@
   /** 入稿用SVG：商品イラスト・白背景を含まず、指定プリント位置のアートワークのみを
    *  実寸(mm)・原寸viewBoxで書き出す。Illustratorでそのまま原寸配置できる。 */
   function exportProductionSVG(areaId, embedFont) {
-    const a = state.product.printAreas.find((x) => x.id === areaId);
+    const a = productAreas().find((x) => x.id === areaId);
     const d = state.designs[areaId];
     if (!a || !d || !d.objects.length) return "";
     const cid = "cut";
@@ -1053,7 +1062,7 @@
   /** 入稿用PNG（透過・高解像度）を指定位置ぶん生成 */
   function exportProductionPNG(areaId, targetDpi) {
     return new Promise((resolve, reject) => {
-      const a = state.product.printAreas.find((x) => x.id === areaId);
+      const a = productAreas().find((x) => x.id === areaId);
       if (!a) return reject(new Error("area not found"));
       const markup = exportProductionSVG(areaId, false); // ラスタライズ用は@import無し
       if (!markup) return reject(new Error("empty"));
@@ -1078,7 +1087,7 @@
 
   /** プリント位置のメタ情報（指示書用） */
   function areaMeta(areaId) {
-    const a = state.product ? state.product.printAreas.find((x) => x.id === areaId) : null;
+    const a = state.product ? productAreas().find((x) => x.id === areaId) : null;
     return a ? { id: a.id, name: a.name, view: a.view, mmW: a.mmW, mmH: a.mmH } : null;
   }
 
@@ -1091,7 +1100,7 @@
     const wasRealism = realismOn;
     realismOn = !!realism; // 入稿/DL用は false（クリーンなベクター）、プレビューは true
     if (view) {
-      const target = state.product.printAreas.find((a) => a.view === view);
+      const target = productAreas().find((a) => a.view === view);
       if (target) state.areaId = target.id;
     }
     state.preview = true;
@@ -1199,10 +1208,10 @@
         undoStack = [];
         redoStack = [];
       }
-      state.areaId = product.printAreas[0].id;
+      state.areaId = productAreas(product)[0].id;
       state.selectedId = null;
       /* 各エリアのデフォルト加工方法を用意 */
-      for (const a of product.printAreas) design(a.id);
+      for (const a of productAreas(product)) design(a.id);
       lastSnapshot = snapshot();
       render();
       callbacks.onChange();
@@ -1259,6 +1268,7 @@
     getPlacements, areaThumbSVG, exportSVG, exportPNG, previewSVG, designViews,
     designAreas, exportProductionSVG, exportProductionPNG, areaMeta,
     variantSVG, variantProductionSVG,
+    areas: () => productAreas(),
 
     get state() { return state; },
     selectedObj,
@@ -1281,12 +1291,12 @@
       state.colorId = product.colors.some((c) => c.id === data.colorId) ? data.colorId : product.colors[0].id;
       /* 信頼できない入力を無害化してから採用（XSS・不正値・未知methodId対策） */
       state.designs = sanitizeDesigns(data.designs, product);
-      state.areaId = data.areaId && product.printAreas.some((a) => a.id === data.areaId)
-        ? data.areaId : product.printAreas[0].id;
+      state.areaId = data.areaId && productAreas(product).some((a) => a.id === data.areaId)
+        ? data.areaId : productAreas(product)[0].id;
       state.selectedId = null;
       undoStack = [];
       redoStack = [];
-      for (const a of product.printAreas) design(a.id);
+      for (const a of productAreas(product)) design(a.id);
       lastSnapshot = snapshot();
       render();
       callbacks.onChange();

@@ -204,8 +204,15 @@ const PRODUCTS = [
      *   photos: { front: "assets/products/tshirt_front.png", back: "assets/products/tshirt_back.png" },
      * 色ごとに写真を分ける場合（キーはカラーID）:
      *   photos: { white: { front: "...", back: "..." }, black: { front: "...", back: "..." } },
-     * ※ 写真は 700×760 の枠に自動フィットします。printAreas の位置と合うよう
-     *    正面からの平置き/トルソー写真を推奨。 */
+     * ※ 写真は 700×760 の枠に自動フィットします。
+     *
+     * 写真の胸・背中の位置が下の printAreas とズレる場合は、photoAreas に
+     * 写真に合わせたプリント範囲を指定できます（写真使用時のみ有効・同じidで）:
+     *   photoAreas: [
+     *     { id: "front", name: "前面", view: "front", x: 250, y: 250, w: 200, h: 260, mmW: 300, mmH: 360 },
+     *     ...（printAreas をコピーして x/y/w/h を写真に合わせて調整）
+     *   ],
+     */
     sizes: ["S", "M", "L", "XL", "XXL"],
     sizeSurcharge: { XXL: 110 },
     colors: pick("white", "black", "navy", "red", "royal", "daisy", "forest", "gray", "burgundy", "pink"),

@@ -327,7 +327,7 @@
       panel.innerHTML = `
         <h3>デザインテンプレート</h3>
         <div class="tp-section">
-          <p class="upload-note" style="margin:0 0 10px">クリックで現在のプリント位置（${(p.printAreas.find((a) => a.id === Editor.state.areaId) || {}).name || ""}）に配置。文字はあとから自由に書き換えできます。</p>
+          <p class="upload-note" style="margin:0 0 10px">クリックで現在のプリント位置（${(Editor.areas().find((a) => a.id === Editor.state.areaId) || {}).name || ""}）に配置。文字はあとから自由に書き換えできます。</p>
           <div class="template-grid">
             ${Templates.TEMPLATES.map((t) => `
               <button class="template-card" data-tpl="${t.id}">
@@ -366,7 +366,7 @@
 
     } else if (app.tab === "method") {
       const d = Editor.designFor(Editor.state.areaId);
-      const area = p.printAreas.find((a) => a.id === Editor.state.areaId);
+      const area = Editor.areas().find((a) => a.id === Editor.state.areaId);
       panel.innerHTML = `
         <h3>加工方法（${area ? area.name : ""}）</h3>
         <div class="tp-section">
@@ -505,7 +505,7 @@
     const bar = $("#positionBar");
     const p = Editor.state.product;
     if (!p) { bar.innerHTML = ""; return; }
-    bar.innerHTML = p.printAreas.map((a) => {
+    bar.innerHTML = Editor.areas().map((a) => {
       const d = Editor.state.designs[a.id];
       const count = d ? d.objects.length : 0;
       return `<button class="pos-thumb${a.id === Editor.state.areaId ? " selected" : ""}" data-area="${a.id}">
@@ -562,7 +562,7 @@
     const box = $("#areaInfoBox");
     const p = Editor.state.product;
     if (!p) { box.innerHTML = ""; return; }
-    const area = p.printAreas.find((a) => a.id === Editor.state.areaId);
+    const area = Editor.areas().find((a) => a.id === Editor.state.areaId);
     const d = Editor.designFor(area.id);
     const m = methodOf(d.methodId);
     const pl = Editor.getPlacements().find((x) => x.areaId === area.id);
@@ -672,7 +672,7 @@
 
     /* デザインサマリ */
     $("#designSummary").innerHTML = placements.map((pl) => {
-      const a = Editor.state.product.printAreas.find((x) => x.id === pl.areaId);
+      const a = Editor.areas().find((x) => x.id === pl.areaId);
       return `<div class="ds-item">${Editor.areaThumbSVG(a)}
         <div class="ds-name">${pl.areaName}</div>
         <div class="ds-meta">${methodOf(pl.methodId).short}・${pl.hasImage ? "フルカラー" : pl.colorCount + "色"}<br>約${(pl.widthMm / 10).toFixed(1)}×${(pl.heightMm / 10).toFixed(1)}cm</div>
@@ -730,7 +730,7 @@
       </tr>`).join("");
 
     const designs = placements.map((pl) => {
-      const a = Editor.state.product.printAreas.find((x) => x.id === pl.areaId);
+      const a = Editor.areas().find((x) => x.id === pl.areaId);
       return `<figure>${Editor.areaThumbSVG(a)}<figcaption>${escapeHtml(pl.areaName)}（${methodOf(pl.methodId).short}）</figcaption></figure>`;
     }).join("");
 
@@ -1180,7 +1180,7 @@
 
     const sections = placements.map((pl) => {
       const m = methodOf(pl.methodId);
-      const thumb = Editor.areaThumbSVG(p.printAreas.find((a) => a.id === pl.areaId));
+      const thumb = Editor.areaThumbSVG(Editor.areas().find((a) => a.id === pl.areaId));
       let detail = "";
       if (pl.hasImage) {
         detail = `<tr><th>データ形式</th><td>フルカラー（インクジェット）。透過PNG／原寸。実効解像度 約${pl.minImageDpi ? Math.round(pl.minImageDpi) : "-"}dpi（150dpi以上推奨）。カラーはsRGB前提・当社でCMYK変換。</td></tr>`;
