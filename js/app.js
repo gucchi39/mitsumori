@@ -31,6 +31,7 @@
     textDefaults: { text: "サンプル", fontId: "gothic", fontSize: 40, fill: "#111111", stroke: "#ffffff", strokeWidth: 0, letterSpacing: 0, arch: 0, vertical: false },
     stampFill: "#111111",
     orderNo: null,
+    roster: { active: false, entries: [] },
   };
 
   /* ================= 初期化 ================= */
@@ -122,6 +123,11 @@
       const el = $(id);
       if (el) el.addEventListener("input", autosave);
     });
+    /* チーム名簿 */
+    $("#rosterActive").addEventListener("change", renderRosterUI);
+    $("#rosterText").addEventListener("input", debounce(renderRosterUI, 250));
+    $("#btnRosterPreview").addEventListener("click", showRosterPreview);
+    $("#rosterPreview").addEventListener("click", (e) => { if (e.target.id === "rosterPreview") e.currentTarget.hidden = true; });
   }
 
   /* ================= ステップ制御 ================= */
@@ -601,21 +607,33 @@
     const p = Editor.state.product;
     const box = $("#sizeInputs");
     if (!p) return;
+    const byRoster = rosterActive();
+    const rq = byRoster ? rosterQuantities() : null;
     box.innerHTML = p.sizes.map((s) => {
       const sur = p.sizeSurcharge[s];
+      const val = byRoster ? (rq[s] || 0) : (cleanQty(app.quantities[s]) || "");
       return `<div class="size-cell">
         <label>${s === "FREE" ? "数量" : escapeHtml(s)}</label>
-        <input type="number" min="0" max="99999" inputmode="numeric" data-size="${escapeHtml(s)}" value="${cleanQty(app.quantities[s]) || ""}" placeholder="0">
+        <input type="number" min="0" max="99999" inputmode="numeric" data-size="${escapeHtml(s)}" value="${val}" placeholder="0" ${byRoster ? "readonly" : ""}>
         ${sur ? `<span class="size-note">+¥${sur}/枚</span>` : ""}
       </div>`;
     }).join("");
+    if (byRoster) {
+      box.insertAdjacentHTML("beforeend", `<p class="size-note" style="grid-column:1/-1">※ 数量は名簿（${app.roster.entries.length}名）から自動集計しています。</p>`);
+    }
     box.querySelectorAll("input[data-size]").forEach((inp) =>
       inp.addEventListener("input", () => {
+        if (byRoster) return;
         app.quantities[inp.dataset.size] = cleanQty(inp.value);
         refreshQuote();
         autosave();
       })
     );
+  }
+
+  /* 見積もり・注文に使う有効数量（名簿が有効なら名簿から） */
+  function effectiveQuantities() {
+    return rosterActive() ? rosterQuantities() : app.quantities;
   }
 
   function refreshQuote() {
@@ -624,7 +642,7 @@
     const placements = Editor.getPlacements();
     const q = Quote.computeQuote({
       productId: p.id,
-      quantities: app.quantities,
+      quantities: effectiveQuantities(),
       placements,
     });
     app.lastQuote = q;
@@ -831,13 +849,15 @@
     const q = app.lastQuote;
     const placements = Editor.getPlacements();
     const color = p.colors.find((c) => c.id === Editor.state.colorId);
-    const sizes = p.sizes.filter((s) => app.quantities[s] > 0).map((s) => ({ size: s, qty: app.quantities[s] }));
+    const eq = effectiveQuantities();
+    const sizes = p.sizes.filter((s) => eq[s] > 0).map((s) => ({ size: s, qty: eq[s] }));
     return {
       orderNo: orderNumber(),
       createdAt: new Date().toISOString(),
       product: { id: p.id, name: p.name, color: color ? color.name : "", colorDark: !!(color && color.dark) },
       quantities: sizes,
       totalQty: q ? q.totalQty : 0,
+      roster: rosterActive() ? app.roster.entries.slice() : null,
       placements: placements.map((pl) => ({
         area: pl.areaName, view: pl.view, method: methodOf(pl.methodId).name,
         colors: pl.hasImage ? "フルカラー" : placementColors(pl).map(colorLabel),
@@ -869,6 +889,10 @@
       const col = Array.isArray(pl.colors) ? pl.colors.join("・") : pl.colors;
       L.push(`・${pl.area}：${pl.method} / ${col} / 約${(pl.widthMm / 10).toFixed(1)}×${(pl.heightMm / 10).toFixed(1)}cm${pl.underbase ? " ※白下地版必要" : ""}`);
     }
+    if (order.roster && order.roster.length) {
+      L.push("", `■ チーム名簿（${order.roster.length}名｜背番号・名前）`);
+      order.roster.forEach((e, i) => L.push(`${i + 1}. ${e.name}　背番号${e.number}　${e.size}`));
+    }
     L.push("", `概算合計：${order.amountTotal != null ? Quote.yen(order.amountTotal) + "（税込）" : "未計算"}`);
     L.push("", "※ デザインの入稿データ（SVG）とプレビュー、デザインデータ(JSON)を添付します。");
     return L.join("\n");
@@ -898,6 +922,7 @@
       editor: Editor.serialize(),
       quantities: app.quantities,
       contact: contactInfo(),
+      roster: app.roster,
     };
     download(`design_${stamp()}.json`, new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }));
   }
@@ -910,6 +935,7 @@
         if (!Editor.load(data.editor)) throw new Error("bad data");
         app.quantities = cleanQuantities(data.quantities);
         applyContact(data.contact);
+        restoreRoster(data.roster);
         if (data.customerName && $("#customerName")) $("#customerName").value = String(data.customerName).slice(0, 100); // 旧形式
         goStep(2);
         renderEditorPanels();
@@ -945,6 +971,124 @@
         if (items.length > 1) toast(`${items.length}面のPNGを書き出しました`);
       })
       .catch(() => alert("PNGの生成に失敗しました。SVG形式をお試しください。"));
+  }
+
+  /* ================= チーム名簿（背番号・名前の一括） ================= */
+
+  /* 名簿テキストを [{name, number, size}] に解析 */
+  function parseRoster(text) {
+    const p = Editor.state.product;
+    const validSizes = p ? p.sizes : [];
+    return String(text || "").split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+      const parts = line.split(/[,、\t]/).map((s) => s.trim());
+      let size = (parts[2] || "").toUpperCase();
+      if (validSizes.length && !validSizes.includes(size)) size = validSizes.includes("FREE") ? "FREE" : validSizes[0];
+      return { name: parts[0] || "", number: parts[1] || "", size };
+    });
+  }
+
+  /* 名簿からサイズ別数量を集計 */
+  function rosterQuantities() {
+    const q = {};
+    for (const e of app.roster.entries) q[e.size] = (q[e.size] || 0) + 1;
+    return q;
+  }
+
+  function rosterActive() {
+    return app.roster.active && app.roster.entries.length > 0;
+  }
+
+  /* 保存/自動保存からの名簿復元（UIにも反映） */
+  function restoreRoster(r) {
+    if (!r || typeof r !== "object") { app.roster = { active: false, entries: [] }; return; }
+    const entries = Array.isArray(r.entries) ? r.entries.map((e) => ({ name: e.name || "", number: e.number || "", size: e.size || "" })) : [];
+    app.roster = { active: !!r.active, entries };
+    const ta = $("#rosterText"), cb = $("#rosterActive"), box = $("#rosterBox");
+    if (ta) ta.value = entries.map((e) => [e.name, e.number, e.size].join(", ")).join("\n");
+    if (cb) cb.checked = app.roster.active;
+    if (box && (app.roster.active || entries.length)) box.open = true;
+    if (ta) renderRosterUI();
+  }
+
+  /* {名前}{番号}{NAME}{NUMBER} を置換 */
+  function substituteText(t, entry) {
+    return String(t)
+      .replace(/\{名前\}|\{NAME\}/gi, entry.name || "")
+      .replace(/\{番号\}|\{NUMBER\}|\{背番号\}/gi, entry.number || "");
+  }
+
+  /* 1メンバー分のデザイン集合（プレースホルダー置換済み） */
+  function memberDesigns(entry) {
+    const base = Editor.serialize().designs || {};
+    const out = {};
+    for (const areaId in base) {
+      const d = base[areaId];
+      out[areaId] = {
+        methodId: d.methodId,
+        objects: (d.objects || []).map((o) => {
+          const c = Object.assign({}, o);
+          if (c.type === "text") c.text = substituteText(c.text, entry);
+          return c;
+        }),
+      };
+    }
+    return out;
+  }
+
+  /* デザインにプレースホルダーが含まれるか */
+  function hasPlaceholders() {
+    const d = Editor.serialize().designs || {};
+    return Object.values(d).some((a) => (a.objects || []).some((o) => o.type === "text" && /\{(名前|NAME|番号|NUMBER|背番号)\}/i.test(o.text || "")));
+  }
+
+  function renderRosterUI() {
+    const box = $("#rosterBox");
+    if (!box) return;
+    const active = $("#rosterActive").checked;
+    app.roster.active = active;
+    app.roster.entries = parseRoster($("#rosterText").value);
+    const n = app.roster.entries.length;
+    const sizes = rosterQuantities();
+    const sizeStr = Object.entries(sizes).map(([s, c]) => `${s}:${c}`).join(" / ");
+    $("#rosterCount").textContent = n ? `${n}名（${sizeStr}）` : "名簿が空です";
+
+    /* テーブル表示 */
+    $("#rosterTable").innerHTML = n
+      ? `<table><thead><tr><th>#</th><th>名前</th><th>番号</th><th>サイズ</th></tr></thead><tbody>${
+          app.roster.entries.map((e, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(e.name)}</td><td>${escapeHtml(e.number)}</td><td>${escapeHtml(e.size)}</td></tr>`).join("")
+        }</tbody></table>`
+      : "";
+
+    if (active && !hasPlaceholders()) {
+      $("#rosterTable").insertAdjacentHTML("afterbegin", `<div class="alert warn" style="margin-bottom:8px">⚠ デザインに <code>{名前}</code> または <code>{番号}</code> が見つかりません。STEP2でテキストに差し込み文字を入れてください（例：背番号のテキストを「{番号}」に）。</div>`);
+    }
+    buildSizeInputs();
+    refreshQuote();
+    autosave();
+  }
+
+  function showRosterPreview() {
+    const p = Editor.state.product;
+    if (!p) return;
+    if (!app.roster.entries.length) { toast("先に名簿を入力してください", "warn"); return; }
+    const views = Editor.designViews();
+    const view = views[0] || "front";
+    const el = $("#rosterPreview");
+    const cards = app.roster.entries.map((e) => {
+      /* 複数SVGを同一ページに並べるため realism(フィルタ)は無効化＝ID衝突回避 */
+      const svg = Editor.variantSVG(memberDesigns(e), view, { realism: false });
+      return `<figure class="fp-fig">
+        <div class="fp-svg">${svg}</div>
+        <figcaption><b>${escapeHtml(e.name || "(名前なし)")}</b>　背番号 ${escapeHtml(e.number || "-")}<br><span>サイズ ${escapeHtml(e.size)}</span></figcaption>
+      </figure>`;
+    }).join("");
+    el.querySelector(".rp-inner").innerHTML = `
+      <h2>👕 名簿プレビュー（${app.roster.entries.length}名・${VIEW_LABEL[view] || view}）</h2>
+      <div class="fp-grid roster-grid">${cards}</div>
+      <p class="fp-note">※ 差し込み文字（{名前}{番号}）を各メンバーの内容に置き換えて表示しています。</p>
+      <button class="primary-btn" id="rpClose">閉じる</button>`;
+    el.hidden = false;
+    $("#rpClose").addEventListener("click", () => { el.hidden = true; });
   }
 
   /* ================= 全面プレビュー ================= */
@@ -994,6 +1138,24 @@
     if (!areas.length) { toast("先にデザインを作成してください", "warn"); return; }
     const no = orderNumber();
     let n = 0;
+
+    if (rosterActive()) {
+      /* 名簿：メンバーごとに差し込み済みの入稿SVGを書き出す */
+      app.roster.entries.forEach((e, i) => {
+        const dsn = memberDesigns(e);
+        const tag = `${String(i + 1).padStart(2, "0")}_${e.number || ""}_${(e.name || "").replace(/[\\/:*?"<>|]/g, "")}`;
+        for (const aid of areas) {
+          const meta = Editor.areaMeta(aid);
+          const svg = Editor.variantProductionSVG(dsn, aid);
+          if (svg) { download(`${no}_${tag}_${meta.name}.svg`, new Blob([svg], { type: "image/svg+xml" })); n++; }
+        }
+      });
+      download(`${no}_指示書.html`, new Blob([specSheetHTML()], { type: "text/html" }));
+      downloadJSON();
+      toast(`名簿${app.roster.entries.length}名分の入稿SVG（計${n}点）を書き出しました`);
+      return;
+    }
+
     for (const aid of areas) {
       const meta = Editor.areaMeta(aid);
       const svg = Editor.exportProductionSVG(aid);
@@ -1075,6 +1237,12 @@
   </div>
   ${warns.length ? `<div class="warn">⚠ 製造上の注意：<br>${warns.map(escapeHtml).join("<br>")}</div>` : ""}
   ${sections}
+  ${order.roster && order.roster.length ? `
+  <h2 style="font-size:15px;border-bottom:2px solid #111;padding-bottom:4px;margin:16px 0 6px">チーム名簿（${order.roster.length}名）— 各枚の差し込み内容</h2>
+  <table class="spec-tbl" style="width:100%"><tr><th style="width:40px">#</th><th>名前（{名前}）</th><th>背番号（{番号}）</th><th style="width:80px">サイズ</th></tr>
+  ${order.roster.map((e, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(e.name)}</td><td>${escapeHtml(e.number)}</td><td>${escapeHtml(e.size)}</td></tr>`).join("")}
+  </table>
+  <p class="u">※ 上記デザインの {名前}{番号} を、名簿の各内容に差し替えて1枚ずつ製作します。個別の入稿SVGも同梱しています。</p>` : ""}
   <div class="note">
     ※ 各プリント位置の入稿データ（SVG＝原寸ベクター／PNG＝透過原寸）を同梱しています。<br>
     ※ 文字は書体参照で書き出されています。確定製版前に当社にてアウトライン化（パス化）します。<br>
@@ -1102,8 +1270,9 @@
     const p = Editor.state.product;
     if (!p) errs.push("商品が選択されていません。");
     if (!hasAnyDesign()) errs.push("デザインが作成されていません。");
-    const totalQty = p ? p.sizes.reduce((s, sz) => s + cleanQty(app.quantities[sz]), 0) : 0;
-    if (totalQty < 1) errs.push("数量が入力されていません。");
+    const eq = effectiveQuantities();
+    const totalQty = p ? p.sizes.reduce((s, sz) => s + cleanQty(eq[sz]), 0) : 0;
+    if (totalQty < 1) errs.push(rosterActive() ? "名簿が空です。名前・番号・サイズを入力してください。" : "数量が入力されていません。");
     const c = contactInfo();
     if (!c.name) errs.push("お名前を入力してください。");
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email)) errs.push("有効なメールアドレスを入力してください。");
@@ -1328,6 +1497,7 @@
         editor: Editor.serialize(),
         quantities: cleanQuantities(app.quantities),
         contact: contactInfo(),
+        roster: app.roster,
         savedAt: Date.now(),
       }));
     } catch (e) { /* 容量超過などは無視（画像入りは localStorage 上限に注意） */ }
@@ -1344,6 +1514,7 @@
         if (Editor.load(data.editor)) {
           app.quantities = cleanQuantities(data.quantities);
           applyContact(data.contact);
+          restoreRoster(data.roster);
           if (data.customerName && $("#customerName")) $("#customerName").value = data.customerName; // 旧形式
           banner.hidden = true;
           goStep(2);

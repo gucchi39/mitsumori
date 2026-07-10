@@ -1108,12 +1108,47 @@
     state.areaId = savedArea;
     realismOn = wasRealism;
     render();
-    return markup;
+    return uniquifyIds(markup);
+  }
+
+  /* 生成したスタンドアロンSVGのID（clip/filter/textPath等）に一意の接頭辞を付ける。
+   * 同一ページに複数のSVGを並べても id が衝突せず、フィルタ・クリップが正しく効く。 */
+  function uniquifyIds(markup) {
+    const p = "u" + (idSeq++) + "_";
+    return markup
+      .replace(/\bid="([^"]+)"/g, (m, id) => `id="${p}${id}"`)
+      .replace(/url\(#([^)]+)\)/g, (m, id) => `url(#${p}${id})`)
+      .replace(/(xlink:href|href)="#([^"]+)"/g, (m, attr, id) => `${attr}="#${p}${id}"`);
   }
 
   /** 全面プレビュー用：ライブDOMに差し込むSVGマークアップ（リアル質感ON・ページ側フォント） */
   function previewSVG(view) {
     return exportSVG(view, false, false, true);
+  }
+
+  /** 任意のデザイン集合を差し替えて1枚SVGを生成（名簿一括プレビュー・書き出し用）。
+   *  現在の編集状態は壊さず元に戻す。opts: {realism, transparent, embedFont} */
+  function variantSVG(designsObj, view, opts) {
+    opts = opts || {};
+    const saved = state.designs;
+    state.designs = designsObj || {};
+    let m;
+    try {
+      m = exportSVG(view, opts.embedFont === true, opts.transparent !== false, opts.realism !== false);
+    } finally {
+      state.designs = saved;
+      render();
+    }
+    return m;
+  }
+
+  /** 任意デザイン・指定プリント位置の入稿SVG（名簿の各メンバー用） */
+  function variantProductionSVG(designsObj, areaId) {
+    const saved = state.designs;
+    state.designs = designsObj || {};
+    let m = "";
+    try { m = exportProductionSVG(areaId, true); } finally { state.designs = saved; }
+    return m;
   }
 
   function exportPNG(scale, view) {
@@ -1223,6 +1258,7 @@
     undo, redo,
     getPlacements, areaThumbSVG, exportSVG, exportPNG, previewSVG, designViews,
     designAreas, exportProductionSVG, exportProductionPNG, areaMeta,
+    variantSVG, variantProductionSVG,
 
     get state() { return state; },
     selectedObj,

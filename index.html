@@ -119,6 +119,25 @@
         <h2>数量を入力してください</h2>
         <p class="hint">数量が多いほど1枚あたりの単価が下がります（数量スライド）。</p>
         <div id="sizeInputs" class="size-inputs"></div>
+
+        <details class="roster-box" id="rosterBox">
+          <summary>👕 チームユニフォーム（背番号・名前の一括入力）</summary>
+          <div class="roster-inner">
+            <p class="hint">
+              デザインの文字に <code>{名前}</code> <code>{番号}</code>（または <code>{NAME}</code> <code>{NUMBER}</code>）を入れておくと、
+              下の名簿の人数分、名前・番号を差し替えて一括生成します。数量は名簿から自動集計されます。
+            </p>
+            <label class="roster-toggle"><input type="checkbox" id="rosterActive"> 名簿を使う（数量を名簿から自動集計）</label>
+            <label class="tp-label" style="margin-top:10px">名簿（1行に「名前, 番号, サイズ」）</label>
+            <textarea id="rosterText" rows="5" placeholder="山田太郎, 10, L&#10;佐藤花子, 7, M&#10;鈴木一郎, 23, XL"></textarea>
+            <div class="roster-actions">
+              <button class="ghost-btn small" id="btnRosterPreview">🔍 名簿プレビュー</button>
+              <span class="roster-count" id="rosterCount"></span>
+            </div>
+            <div id="rosterTable" class="roster-table"></div>
+          </div>
+        </details>
+
         <div id="quoteAlerts"></div>
         <div class="design-summary" id="designSummary"></div>
 
@@ -213,6 +232,11 @@
 <!-- ============ 全面プレビュー ============ -->
 <div id="fullPreview" class="order-complete" hidden>
   <div class="oc-card fp-card"><div class="fp-inner"></div></div>
+</div>
+
+<!-- ============ 名簿プレビュー ============ -->
+<div id="rosterPreview" class="order-complete" hidden>
+  <div class="oc-card fp-card"><div class="rp-inner"></div></div>
 </div>
 
 <div id="toastBox" class="toast-box" aria-live="polite"></div>
