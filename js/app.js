@@ -277,7 +277,7 @@
       panel.innerHTML = `
         <h3>${editing ? "テキストを編集" : "テキストを追加"}</h3>
         <div class="tp-section">
-          <textarea id="tpText" placeholder="文字を入力（改行可）">${escapeHtml(t.text)}</textarea>
+          <textarea id="tpText" placeholder="文字を入力（改行可）" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">${escapeHtml(t.text)}</textarea>
           <span class="tp-label">フォント</span>
           <select id="tpFont">${fontOptions}</select>
           <span class="tp-label">文字サイズ</span>
@@ -421,6 +421,11 @@
       });
       el.addEventListener("change", () => applyLive(true));
     });
+    /* IME（日本語入力・予測変換）の変換中/確定時もキャンバスへ即プレビュー。
+       環境によっては変換中に input が発火しないため、composition イベントでも反映する。 */
+    const tpText = document.getElementById("tpText");
+    tpText.addEventListener("compositionupdate", () => applyLive(false));
+    tpText.addEventListener("compositionend", () => applyLive(false));
     document.querySelectorAll("#toolPanel [data-fill]").forEach((b) =>
       b.addEventListener("click", () => {
         app.textDefaults.fill = b.dataset.fill;
