@@ -91,76 +91,55 @@
       <path d="M122 358 L206 326 M578 358 L494 326" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5" fill="none"/>`;
   }
 
-  /* ---------------- 袖ビュー（シャツを横向き＝側面から見て、手前の袖を正面に） ----------------
-   * 袖にマークを付けるとき、参考サービスのようにTシャツを側面から見た状態で
-   * 手前の半袖が正面を向き、その面に版面（プリント範囲）がのるように描く。
-   * 左右どちらの袖でも同じ見え方（デザインの向きは変えない）。 */
+  /* ---------------- 袖ビュー（Tシャツを側面から見たシルエット） ----------------
+   * 参考サービスのように、シャツ全体を真横から見た自然な大きさで表示する。
+   * 上部が肩・半袖、下が胴・裾。版面（プリント範囲）は袖側の面にのる。
+   * 「袖だけ拡大」ではなく、シャツ1枚をそのまま側面表示。 */
   function sleeveSide(c) {
     const E = edge(c), S = seam(c), R = rib(c);
-    /* 奥のシャツ本体（側面から見た胴）。襟・なだらかな肩・裾を持ち、
-     * 手前の袖の上（肩・襟）と下（裾）からのぞく。とがった飾りは付けない。 */
-    const body = `
-      M258 222
-      C264 196 284 180 312 176
-      C326 170 340 178 350 178
-      C360 178 374 170 388 176
-      C416 180 436 196 442 222
-      C452 262 458 316 459 368
-      C461 462 457 546 451 578
-      Q447 607 411 607
-      L289 607
-      Q253 607 251 575
-      C245 506 247 394 253 336
-      C255 298 254 260 258 222 Z`;
-    /* 襟（首もとの開き・浅いU） */
-    const collar = `M318 184 C332 208 368 208 382 184 C376 196 364 202 350 202 C336 202 324 196 318 184 Z`;
-    /* 手前の半袖＝正面向きの筒。上に袖山（肩の弧）、下に丸い袖口。
-     * 版面(x230,y288,w240,h192)を包み、奥の胴より横に張り出して手前に見える。 */
-    const sleeve = `
-      M222 306
-      C210 308 204 328 204 352
-      L204 442
-      C204 468 214 490 236 500
-      C288 520 412 520 464 500
-      C486 490 496 468 496 442
-      L496 352
-      C496 328 490 308 478 306
-      C410 296 290 296 222 306 Z`;
+    /* シャツの側面シルエット（1枚もの・大きめ）。前（左）に首の開き、
+     * 上に袖山、右へ背中、下に裾。 */
+    const shirt = `
+      M250 252
+      C252 224 262 202 280 192
+      C302 178 334 170 366 170
+      C416 170 456 204 474 256
+      C488 300 493 350 494 398
+      C496 478 493 552 487 580
+      Q483 608 449 609
+      L267 609
+      Q233 608 231 577
+      C225 500 227 398 233 340
+      C236 298 240 268 250 252 Z`;
+    /* 首の開き（側面から見た衿ぐり）：前上部の小さなえぐり */
+    const neck = `M258 250 C260 226 268 206 284 198 C298 191 312 196 316 208 C300 210 286 224 282 248 Z`;
     return `${GROUND}
       <defs>
-        <clipPath id="slsc"><path d="${sleeve}"/></clipPath>
-        <radialGradient id="slg-hi" cx="50%" cy="40%" r="58%">
-          <stop offset="0%" stop-color="#fff" stop-opacity="0.22"/>
-          <stop offset="62%" stop-color="#fff" stop-opacity="0.05"/>
+        <clipPath id="slsc"><path d="${shirt}"/></clipPath>
+        <radialGradient id="slg-hi" cx="48%" cy="36%" r="60%">
+          <stop offset="0%" stop-color="#fff" stop-opacity="0.20"/>
+          <stop offset="60%" stop-color="#fff" stop-opacity="0.05"/>
           <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
         </radialGradient>
         <linearGradient id="slg-side" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stop-color="#000" stop-opacity="0.20"/>
-          <stop offset="20%" stop-color="#000" stop-opacity="0"/>
-          <stop offset="80%" stop-color="#000" stop-opacity="0"/>
+          <stop offset="0%" stop-color="#000" stop-opacity="0.16"/>
+          <stop offset="22%" stop-color="#000" stop-opacity="0"/>
+          <stop offset="78%" stop-color="#000" stop-opacity="0"/>
           <stop offset="100%" stop-color="#000" stop-opacity="0.20"/>
         </linearGradient>
-        <linearGradient id="slg-cuff" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#000" stop-opacity="0"/>
-          <stop offset="100%" stop-color="#000" stop-opacity="0.12"/>
-        </linearGradient>
       </defs>
-      <!-- 奥の本体（やや暗く＝奥行き） -->
-      <path d="${body}" fill="${c}" stroke="${E}" stroke-width="4" stroke-linejoin="round"/>
-      <path d="${body}" fill="#000" opacity="0.07"/>
-      <path d="${collar}" fill="${R}" stroke="${E}" stroke-width="2.5" stroke-linejoin="round"/>
-      <!-- 肩の縫い目 -->
-      <path d="M288 190 C312 202 388 202 412 190" fill="none" stroke="${S}" stroke-width="2.5"/>
-      <!-- 手前の袖（明るく＝手前） -->
-      <path d="${sleeve}" fill="${c}" stroke="${E}" stroke-width="4" stroke-linejoin="round"/>
+      <path d="${shirt}" fill="${c}" stroke="${E}" stroke-width="4" stroke-linejoin="round"/>
       <g clip-path="url(#slsc)">
-        <rect x="200" y="300" width="300" height="212" fill="url(#slg-side)"/>
-        <ellipse cx="350" cy="392" rx="158" ry="120" fill="url(#slg-hi)"/>
-        <rect x="200" y="470" width="300" height="42" fill="url(#slg-cuff)"/>
-        <!-- 袖山（肩に付く弧） -->
-        <path d="M226 314 C300 300 400 300 474 314" fill="none" stroke="${S}" stroke-width="2.5"/>
-        <!-- 袖口リブ -->
-        <path d="M236 476 C300 490 400 490 464 476" fill="none" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5"/>
+        <rect x="220" y="160" width="290" height="450" fill="url(#slg-side)"/>
+        <ellipse cx="350" cy="360" rx="170" ry="220" fill="url(#slg-hi)"/>
+        <!-- 首の開き（衿） -->
+        <path d="${neck}" fill="${R}" stroke="${S}" stroke-width="2"/>
+        <!-- 袖ぐり（袖と身頃の切り替え縫い目） -->
+        <path d="M300 196 C270 250 262 320 268 392 C272 448 288 520 312 574" fill="none" stroke="${S}" stroke-width="2.5"/>
+        <!-- 袖口（半袖の裾）＝袖側の面の下端 -->
+        <path d="M268 392 C320 372 430 372 470 388" fill="none" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5"/>
+        <!-- 裾リブ -->
+        <path d="M235 566 L485 566" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5"/>
       </g>`;
   }
 
