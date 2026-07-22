@@ -826,9 +826,15 @@
   function orderNumber() {
     if (app.orderNo) return app.orderNo;
     const d = new Date();
-    const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
-    const rnd = String(Math.floor(1000 + (Date.now() % 9000)));
-    app.orderNo = `${(CONFIG.ORDER && CONFIG.ORDER.autoNumber) || "ORD"}-${ymd}-${rnd}`;
+    const pad = (v, n) => String(v).padStart(n || 2, "0");
+    const ymd = `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
+    const hms = `${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+    /* 秒精度の時刻＋暗号乱数3桁。衝突には同一秒の注文が同じ乱数を引く必要があり
+     * 実用上重複しない。電話でも読み上げやすい数字のみの体系 */
+    let r;
+    try { r = crypto.getRandomValues(new Uint32Array(1))[0] % 1000; }
+    catch (e) { r = Math.floor(Math.random() * 1000); }
+    app.orderNo = `${(CONFIG.ORDER && CONFIG.ORDER.autoNumber) || "ORD"}-${ymd}-${hms}-${pad(r, 3)}`;
     return app.orderNo;
   }
 
@@ -1206,8 +1212,10 @@
       const m = methodOf(pl.methodId);
       const thumb = Editor.areaThumbSVG(Editor.areas().find((a) => a.id === pl.areaId));
       let detail = "";
-      if (pl.hasImage) {
-        detail = `<tr><th>データ形式</th><td>フルカラー（インクジェット）。透過PNG／原寸。実効解像度 約${pl.minImageDpi ? Math.round(pl.minImageDpi) : "-"}dpi（150dpi以上推奨）。カラーはsRGB前提・当社でCMYK変換。</td></tr>`;
+      /* 記載は必ず選択中の加工方法（pl.methodId）に従う。画像が置かれていても
+       * シルク/刺繍を選んでいれば「フルカラー」とは書かない（指示の矛盾防止） */
+      if (pl.methodId === "inkjet") {
+        detail = `<tr><th>データ形式</th><td>フルカラー（インクジェット）。透過PNG／原寸。${pl.hasImage ? `実効解像度 約${pl.minImageDpi ? Math.round(pl.minImageDpi) : "-"}dpi（150dpi以上推奨）。` : ""}カラーはsRGB前提・当社でCMYK変換。</td></tr>`;
       } else {
         const cols = placementColors(pl);
         const rows = cols.map((c, i) =>
@@ -1217,6 +1225,7 @@
           <table class="cols"><tr><th></th><th>版</th><th>色名</th><th>指定色/糸番</th></tr>${rows}</table>
           ${needsUnderbase(pl) ? '<p class="u">＋ 白下地版（アンダーベース）1版</p>' : ""}
           ${pl.methodId === "embroidery" ? '<p class="u">※ 刺繍データ（DST/PES）は当社にてデジタイズします。</p>' : ""}
+          ${pl.hasImage ? `<p class="u">⚠ この位置には<b>アップロード画像</b>が含まれます。${pl.methodId === "silk" ? "シルクスクリーンでは画像の色分解（1色=1版）が必要です。再現可否は製版前に確認してください。" : "刺繍では写真・グラデーションは再現できません。デジタイズ時に色数・表現を確定してください。"}</p>` : ""}
         </td></tr>`;
       }
       return `<div class="spec-area">
@@ -1300,6 +1309,8 @@
     if (rosterActive()) {
       const bad = rosterBadRows();
       if (bad.length) errs.push(`名簿にサイズが不明な行が${bad.length}行あります（${bad.map((b) => `${b.row}行目「${b.size || "未入力"}」`).join("、")}）。この商品のサイズ：${p ? p.sizes.join(" / ") : ""}`);
+      /* 差し込み文字が無いと全員同じ仕上がりの入稿データが生成されてしまう */
+      if (!hasPlaceholders()) errs.push("名簿を使う場合は、デザインの文字に {名前} または {番号}（{NAME}/{NUMBER}も可）を入れてください。STEP2のテキストで設定できます。");
     }
     const c = contactInfo();
     if (!c.name) errs.push("お名前を入力してください。");

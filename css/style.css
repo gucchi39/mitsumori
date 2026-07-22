@@ -393,6 +393,9 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .quote-sheet { display: none; }
 @media print {
   body > *:not(#quoteSheet) { display: none !important; }
+  /* 画面用の height:100dvh / overflow:hidden のままだと2ページ目以降が
+   * 切り捨てられるため、印刷時は解除して全ページ出力する */
+  html, body { height: auto !important; overflow: visible !important; }
   body { background: #fff; display: block; }
   .quote-sheet { display: block; padding: 10mm 12mm; font-size: 12px; color: #000; }
   .qs-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8mm; }
