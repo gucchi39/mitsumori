@@ -222,8 +222,8 @@ const PRODUCTS = [
       { id: "front",   name: "前面",   view: "front", x: 225, y: 235, w: 250, h: 300, mmW: 300, mmH: 360 },
       { id: "chest",   name: "左胸",   view: "front", x: 385, y: 215, w: 85,  h: 85,  mmW: 100, mmH: 100 },
       { id: "back",    name: "背面",   view: "back",  x: 225, y: 215, w: 250, h: 320, mmW: 300, mmH: 384 },
-      { id: "sleeveL", name: "左袖",   view: "front", x: 543, y: 258, w: 68,  h: 54,  mmW: 80,  mmH: 64 },
-      { id: "sleeveR", name: "右袖",   view: "front", x: 89,  y: 258, w: 68,  h: 54,  mmW: 80,  mmH: 64 },
+      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 230, y: 288, w: 240, h: 192, mmW: 80,  mmH: 64 },
+      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 230, y: 288, w: 240, h: 192, mmW: 80,  mmH: 64 },
     ],
   },
   {
@@ -241,8 +241,8 @@ const PRODUCTS = [
       { id: "front",   name: "前面",   view: "front", x: 225, y: 235, w: 250, h: 300, mmW: 300, mmH: 360 },
       { id: "chest",   name: "左胸",   view: "front", x: 385, y: 215, w: 85,  h: 85,  mmW: 100, mmH: 100 },
       { id: "back",    name: "背面",   view: "back",  x: 225, y: 215, w: 250, h: 320, mmW: 300, mmH: 384 },
-      { id: "sleeveL", name: "左袖",   view: "front", x: 543, y: 258, w: 68,  h: 54,  mmW: 80,  mmH: 64 },
-      { id: "sleeveR", name: "右袖",   view: "front", x: 89,  y: 258, w: 68,  h: 54,  mmW: 80,  mmH: 64 },
+      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 230, y: 288, w: 240, h: 192, mmW: 80,  mmH: 64 },
+      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 230, y: 288, w: 240, h: 192, mmW: 80,  mmH: 64 },
     ],
   },
   {
@@ -260,7 +260,7 @@ const PRODUCTS = [
       { id: "chest",   name: "左胸",   view: "front", x: 388, y: 235, w: 85,  h: 85,  mmW: 100, mmH: 100 },
       { id: "front",   name: "前面",   view: "front", x: 235, y: 320, w: 230, h: 210, mmW: 280, mmH: 255 },
       { id: "back",    name: "背面",   view: "back",  x: 225, y: 225, w: 250, h: 310, mmW: 300, mmH: 372 },
-      { id: "sleeveL", name: "左袖",   view: "front", x: 545, y: 268, w: 66,  h: 52,  mmW: 80,  mmH: 63 },
+      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 230, y: 289, w: 240, h: 189, mmW: 80,  mmH: 63 },
     ],
   },
   {
@@ -277,7 +277,7 @@ const PRODUCTS = [
     printAreas: [
       { id: "front",   name: "前面",   view: "front", x: 240, y: 300, w: 220, h: 170, mmW: 260, mmH: 200 },
       { id: "back",    name: "背面",   view: "back",  x: 225, y: 235, w: 250, h: 300, mmW: 300, mmH: 360 },
-      { id: "sleeveL", name: "左袖",   view: "front", x: 555, y: 300, w: 64,  h: 120, mmW: 75,  mmH: 140 },
+      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 280, y: 254, w: 140, h: 260, mmW: 75,  mmH: 140 },
     ],
   },
   {

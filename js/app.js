@@ -957,7 +957,7 @@
 
   /* 前面・背面など、デザインのある全ビューをビュー名付きで書き出す
    * （最後に見ていた面だけ書き出して反対面が入稿から欠落するのを防ぐ） */
-  const VIEW_LABEL = { front: "前面", back: "背面" };
+  const VIEW_LABEL = { front: "前面", back: "背面", sleeveL: "左袖", sleeveR: "右袖" };
 
   function downloadSVG() {
     if (!Editor.state.product) return;
@@ -1231,7 +1231,7 @@
       return `<div class="spec-area">
         <div class="spec-fig">${thumb}</div>
         <table class="spec-tbl">
-          <tr><th>プリント位置</th><td><b>${escapeHtml(pl.areaName)}</b>（${pl.view === "back" ? "背面" : "前面"}）</td></tr>
+          <tr><th>プリント位置</th><td><b>${escapeHtml(pl.areaName)}</b>（${VIEW_LABEL[pl.view] || "前面"}）</td></tr>
           <tr><th>加工方法</th><td>${m.icon} ${escapeHtml(m.name)}</td></tr>
           <tr><th>仕上がり実寸</th><td>約 ${(pl.widthMm / 10).toFixed(1)} × ${(pl.heightMm / 10).toFixed(1)} cm（範囲最大 ${pl.areaId && Editor.areaMeta(pl.areaId).mmW / 10}×${Editor.areaMeta(pl.areaId).mmH / 10}cm）</td></tr>
           ${detail}

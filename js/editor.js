@@ -364,8 +364,8 @@
       .join("");
     const defs = clipDefs + (fx ? FX_DEFS : "");
 
-    /* 着用イメージ：商品の背後にスタジオ背景＋トルソー */
-    const backdrop = fx && state.worn ? Mockups.wornBackdrop(state.product, view) : "";
+    /* 着用イメージ：商品の背後にスタジオ背景＋トルソー（前面・背面のみ） */
+    const backdrop = fx && state.worn && (view === "front" || view === "back") ? Mockups.wornBackdrop(state.product, view) : "";
     const rawMockup = Mockups.renderProductMockup(state.product, bodyHex(), state.colorId, view);
     const mockup = fx ? `<g filter="url(#fxGarment)">${rawMockup}</g>` : rawMockup;
 
