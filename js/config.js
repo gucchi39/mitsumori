@@ -200,24 +200,29 @@ const PRODUCTS = [
     category: "Tシャツ",
     basePrice: 890,
     note: "綿100%・ヘビーウェイト。イベント・チームウェアの定番。",
-    /* 実際の商品写真を使う場合は photos を設定（無ければイラスト表示）:
-     *   photos: { front: "assets/products/tshirt_front.png", back: "assets/products/tshirt_back.png" },
-     * 色ごとに写真を分ける場合（キーはカラーID）:
-     *   photos: { white: { front: "...", back: "..." }, black: { front: "...", back: "..." } },
-     * ※ 写真は 700×760 の枠に自動フィットします。
-     *
-     * 写真の胸・背中の位置が下の printAreas とズレる場合は、photoAreas に
-     * 写真に合わせたプリント範囲を指定できます（写真使用時のみ有効・同じidで）:
-     *   photoAreas: [
-     *     { id: "front", name: "前面", view: "front", x: 250, y: 250, w: 200, h: 260, mmW: 300, mmH: 360 },
-     *     ...（printAreas をコピーして x/y/w/h を写真に合わせて調整）
-     *   ],
-     */
+    /* 実写真モックアップ（グレー無地1枚→全色を自動生成）。
+     * autoColor: true で、選択カラーに応じて写真を色替え（陰影は保持）。
+     * baseLum は元写真の平均明度（0-1）。濃色は暗く・淡色は明るく振れる基準。 */
+    photos: {
+      autoColor: true,
+      baseLum: 0.41,
+      front: "assets/products/tshirt_front.png",
+      sleeveL: "assets/products/tshirt_sleeve.png",
+      sleeveR: "assets/products/tshirt_sleeve.png",
+    },
     sizes: ["S", "M", "L", "XL", "XXL"],
     sizeSurcharge: { XXL: 110 },
     colors: pick("white", "black", "navy", "red", "royal", "daisy", "forest", "gray", "burgundy", "pink"),
     mockup: "tshirt",
     methods: ["silk", "inkjet", "embroidery"],
+    /* 写真使用時のプリント範囲（写真の胸・袖の位置に合わせる） */
+    photoAreas: [
+      { id: "front",   name: "前面",   view: "front", x: 258, y: 250, w: 210, h: 250, mmW: 300, mmH: 360 },
+      { id: "chest",   name: "左胸",   view: "front", x: 398, y: 250, w: 78,  h: 78,  mmW: 100, mmH: 100 },
+      { id: "back",    name: "背面",   view: "back",  x: 225, y: 215, w: 250, h: 320, mmW: 300, mmH: 384 },
+      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 300, y: 250, w: 150, h: 120, mmW: 80, mmH: 64 },
+      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 300, y: 250, w: 150, h: 120, mmW: 80, mmH: 64 },
+    ],
     printAreas: [
       { id: "front",   name: "前面",   view: "front", x: 225, y: 235, w: 250, h: 300, mmW: 300, mmH: 360 },
       { id: "chest",   name: "左胸",   view: "front", x: 385, y: 215, w: 85,  h: 85,  mmW: 100, mmH: 100 },
