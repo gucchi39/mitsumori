@@ -91,35 +91,77 @@
       <path d="M122 358 L206 326 M578 358 L494 326" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5" fill="none"/>`;
   }
 
-  /* ---------------- 袖（フラット・正面向き） ----------------
-   * 袖にマークを付けるとき、側面を正面に起こした「平置きの袖」で編集できるよう
-   * 大きく描画する。左右どちらの袖でも同じ形（デザインの向きは変えない）。 */
-  function sleeveFlat(c) {
+  /* ---------------- 袖ビュー（シャツを横向き＝側面から見て、手前の袖を正面に） ----------------
+   * 袖にマークを付けるとき、参考サービスのようにTシャツを側面から見た状態で
+   * 手前の半袖が正面を向き、その面に版面（プリント範囲）がのるように描く。
+   * 左右どちらの袖でも同じ見え方（デザインの向きは変えない）。 */
+  function sleeveSide(c) {
     const E = edge(c), S = seam(c), R = rib(c);
-    const shape = `M196 262 Q190 240 214 236 L486 236 Q510 240 504 262 L476 512 Q474 536 450 536 L250 536 Q226 536 224 512 Z`;
+    /* 奥のシャツ本体（側面から見た胴）。襟・なだらかな肩・裾を持ち、
+     * 手前の袖の上（肩・襟）と下（裾）からのぞく。とがった飾りは付けない。 */
+    const body = `
+      M258 222
+      C264 196 284 180 312 176
+      C326 170 340 178 350 178
+      C360 178 374 170 388 176
+      C416 180 436 196 442 222
+      C452 262 458 316 459 368
+      C461 462 457 546 451 578
+      Q447 607 411 607
+      L289 607
+      Q253 607 251 575
+      C245 506 247 394 253 336
+      C255 298 254 260 258 222 Z`;
+    /* 襟（首もとの開き・浅いU） */
+    const collar = `M318 184 C332 208 368 208 382 184 C376 196 364 202 350 202 C336 202 324 196 318 184 Z`;
+    /* 手前の半袖＝正面向きの筒。上に袖山（肩の弧）、下に丸い袖口。
+     * 版面(x230,y288,w240,h192)を包み、奥の胴より横に張り出して手前に見える。 */
+    const sleeve = `
+      M222 306
+      C210 308 204 328 204 352
+      L204 442
+      C204 468 214 490 236 500
+      C288 520 412 520 464 500
+      C486 490 496 468 496 442
+      L496 352
+      C496 328 490 308 478 306
+      C410 296 290 296 222 306 Z`;
     return `${GROUND}
       <defs>
-        <clipPath id="slc"><path d="${shape}"/></clipPath>
-        <radialGradient id="slg-hi" cx="50%" cy="44%" r="54%">
-          <stop offset="0%" stop-color="#fff" stop-opacity="0.17"/>
-          <stop offset="60%" stop-color="#fff" stop-opacity="0.04"/>
+        <clipPath id="slsc"><path d="${sleeve}"/></clipPath>
+        <radialGradient id="slg-hi" cx="50%" cy="40%" r="58%">
+          <stop offset="0%" stop-color="#fff" stop-opacity="0.22"/>
+          <stop offset="62%" stop-color="#fff" stop-opacity="0.05"/>
           <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
         </radialGradient>
         <linearGradient id="slg-side" x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stop-color="#000" stop-opacity="0.24"/>
-          <stop offset="16%" stop-color="#000" stop-opacity="0"/>
-          <stop offset="84%" stop-color="#000" stop-opacity="0"/>
-          <stop offset="100%" stop-color="#000" stop-opacity="0.24"/>
+          <stop offset="0%" stop-color="#000" stop-opacity="0.20"/>
+          <stop offset="20%" stop-color="#000" stop-opacity="0"/>
+          <stop offset="80%" stop-color="#000" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#000" stop-opacity="0.20"/>
+        </linearGradient>
+        <linearGradient id="slg-cuff" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#000" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#000" stop-opacity="0.12"/>
         </linearGradient>
       </defs>
-      <path d="${shape}" fill="${c}" stroke="${E}" stroke-width="4" stroke-linejoin="round"/>
-      <g clip-path="url(#slc)">
-        <rect x="180" y="230" width="340" height="320" fill="url(#slg-side)"/>
-        <ellipse cx="350" cy="384" rx="150" ry="150" fill="url(#slg-hi)"/>
-      </g>
-      <path d="M214 252 Q350 288 486 252" fill="none" stroke="${S}" stroke-width="3"/>
-      <rect x="230" y="504" width="240" height="30" rx="7" fill="${R}" opacity="0.55"/>
-      <path d="M236 500 L464 500" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5" fill="none"/>`;
+      <!-- 奥の本体（やや暗く＝奥行き） -->
+      <path d="${body}" fill="${c}" stroke="${E}" stroke-width="4" stroke-linejoin="round"/>
+      <path d="${body}" fill="#000" opacity="0.07"/>
+      <path d="${collar}" fill="${R}" stroke="${E}" stroke-width="2.5" stroke-linejoin="round"/>
+      <!-- 肩の縫い目 -->
+      <path d="M288 190 C312 202 388 202 412 190" fill="none" stroke="${S}" stroke-width="2.5"/>
+      <!-- 手前の袖（明るく＝手前） -->
+      <path d="${sleeve}" fill="${c}" stroke="${E}" stroke-width="4" stroke-linejoin="round"/>
+      <g clip-path="url(#slsc)">
+        <rect x="200" y="300" width="300" height="212" fill="url(#slg-side)"/>
+        <ellipse cx="350" cy="392" rx="158" ry="120" fill="url(#slg-hi)"/>
+        <rect x="200" y="470" width="300" height="42" fill="url(#slg-cuff)"/>
+        <!-- 袖山（肩に付く弧） -->
+        <path d="M226 314 C300 300 400 300 474 314" fill="none" stroke="${S}" stroke-width="2.5"/>
+        <!-- 袖口リブ -->
+        <path d="M236 476 C300 490 400 490 464 476" fill="none" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5"/>
+      </g>`;
   }
 
   /* ---------------- ポロシャツ ---------------- */
@@ -241,9 +283,9 @@
 
   /** モックアップのSVG内部マークアップを返す */
   function renderMockup(mockupId, colorHex, view) {
-    /* 袖ビュー（sleeveL/sleeveR）は、どの商品でも平置きの袖を正面向きで大きく描く */
+    /* 袖ビュー（sleeveL/sleeveR）は、どの商品でも側面から見た袖を正面向きで大きく描く */
     if (view && String(view).indexOf("sleeve") === 0) {
-      return `<g class="mockup">${sleeveFlat(colorHex)}</g>`;
+      return `<g class="mockup">${sleeveSide(colorHex)}</g>`;
     }
     const fn = MOCKUPS[mockupId];
     if (!fn) return "";
