@@ -246,5 +246,5 @@
 
   function isWearable(product) { return !!(product && WEARABLE[product.mockup]); }
 
-  globalThis.Mockups = { renderMockup, renderProductMockup, wornBackdrop, isWearable, shade };
+  globalThis.Mockups = { renderMockup, renderProductMockup, photoFor, wornBackdrop, isWearable, shade };
 })();

@@ -1322,11 +1322,25 @@
 
   async function buildOrderFiles(order) {
     const files = [];
-    for (const aid of Editor.designAreas()) {
+    const areas = Editor.designAreas();
+    for (const aid of areas) {
       const meta = Editor.areaMeta(aid);
       const svg = Editor.exportProductionSVG(aid);
       if (svg) files.push({ name: `${order.orderNo}_${meta.name}.svg`, blob: new Blob([svg], { type: "image/svg+xml" }) });
       try { files.push({ name: `${order.orderNo}_${meta.name}.png`, blob: await Editor.exportProductionPNG(aid, 150) }); } catch (e) {}
+    }
+    /* 名簿（チームユニフォーム）注文：{名前}{番号}を各メンバーに差し替えた
+     * 個別の入稿SVGも添付する（テンプレのままでは製作できないため） */
+    if (rosterActive()) {
+      app.roster.entries.forEach((e, i) => {
+        const dsn = memberDesigns(e);
+        const tag = `${String(i + 1).padStart(2, "0")}_${e.number || ""}_${(e.name || "").replace(/[\\/:*?"<>|]/g, "")}`;
+        for (const aid of areas) {
+          const meta = Editor.areaMeta(aid);
+          const svg = Editor.variantProductionSVG(dsn, aid);
+          if (svg) files.push({ name: `${order.orderNo}_${tag}_${meta.name}.svg`, blob: new Blob([svg], { type: "image/svg+xml" }) });
+        }
+      });
     }
     const json = JSON.stringify({ app: "mitsumori", version: 2, order, editor: Editor.serialize() });
     files.push({ name: `${order.orderNo}_design.json`, blob: new Blob([json], { type: "application/json" }) });
@@ -1418,11 +1432,12 @@
       removed += (d.objects || []).length - objs.length;
       designs[k] = { methodId: d.methodId, objects: objs };
     }
-    /* 共有URLは第三者に送るため、個人情報（氏名・連絡先）は一切含めない。
-     * デザインと数量のみを埋め込む。 */
+    /* 共有URLは第三者に送るため、個人情報（氏名・連絡先・名簿）は一切含めない。
+     * デザインと数量のみを埋め込む。名簿使用中はサイズ別集計値を数量として入れる
+     * （名前・背番号は含まれない）。 */
     const payload = JSON.stringify({
       ...data, designs,
-      quantities: cleanQuantities(app.quantities),
+      quantities: cleanQuantities(effectiveQuantities()),
     });
     let url;
     if (typeof CompressionStream !== "undefined") {
@@ -1476,6 +1491,9 @@
         document.addEventListener(ev, function unlock() { shareLocked = false; document.removeEventListener(ev, unlock); }, { once: true }));
       goStep(2);
       renderEditorPanels();
+      /* 取り込み後はURLからハッシュを除去：このURLを再読み込みしても
+       * 受け手の編集（自動保存）が共有デザインで上書きされないようにする */
+      try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
       toast("共有されたデザインを読み込みました");
       return true;
     } catch (e) {

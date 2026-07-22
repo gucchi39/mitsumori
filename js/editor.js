@@ -30,6 +30,7 @@
   };
 
   let realismOn = true;     // リアル質感フィルタ（入稿書き出し時のみ false）
+  let wornPrevPreview = false; // 着用イメージON直前のプレビュー状態（OFFで復元して編集に戻す）
   let interacting = false;  // ドラッグ中は重いフィルタを外す（タブレットで滑らかに＆当たり判定を正確に）
 
   let undoStack = [];
@@ -114,13 +115,18 @@
     return clean;
   }
 
-  /* 実効プリント範囲：写真モックアップ使用時に photoAreas があればそちらを使う
-   * （写真の胸・背中の位置に合わせて版面を配置できる）。無ければ通常の printAreas。 */
+  /* 実効プリント範囲：写真モックアップが「実際に表示される」色・面だけ photoAreas を使う。
+   * 写真が無い色・面はイラスト表示にフォールバックするため、版面も printAreas に
+   * 合わせないと点線枠・入稿座標が商品とズレる。判定は表示側と同じ Mockups.photoFor。 */
   function productAreas(p) {
     p = p || state.product;
     if (!p) return [];
-    if (p.photoAreas && p.photos && p.photoAreas.length) return p.photoAreas;
-    return p.printAreas;
+    const pas = p.photoAreas;
+    if (!(pas && pas.length && p.photos)) return p.printAreas;
+    return p.printAreas.map((a) => {
+      const photo = Mockups.photoFor ? Mockups.photoFor(p, state.colorId, a.view || "front") : null;
+      return photo ? (pas.find((x) => x.id === a.id) || a) : a;
+    });
   }
 
   function currentArea() {
@@ -1048,7 +1054,8 @@
     const cid = "cut";
     /* @import はダウンロードSVGのみ（<img>ラスタライズ時は secure static mode で
      * 外部参照が読めず画像自体が壊れるため embedFont=false で省く） */
-    const fontStyle = embedFont !== false && FONT_IMPORT_URL ? `<style type="text/css">@import url("${FONT_IMPORT_URL}");</style>` : "";
+    /* URLの & は XML では &amp; にしないと SVG 自体が不正になり Illustrator 等で開けない */
+    const fontStyle = embedFont !== false && FONT_IMPORT_URL ? `<style type="text/css">@import url("${esc(FONT_IMPORT_URL)}");</style>` : "";
     const body = d.objects.map((o) => objMarkup(o, false)).join("");
     /* 背景は透過（白ベタを入れない＝濃色ボディに白い四角が刷られない）。
      * viewBox はプリント範囲そのもの、width/height は実寸mm。 */
@@ -1108,7 +1115,7 @@
     /* Web フォントの @import を埋め込み、ブラウザで開いた際に書体が再現されるようにする
      * （<img>でラスタライズする用途では embedFont=false にして外部参照を外す） */
     const fontStyle = embedFont !== false && FONT_IMPORT_URL
-      ? `<defs><style type="text/css">@import url("${FONT_IMPORT_URL}");</style></defs>`
+      ? `<defs><style type="text/css">@import url("${esc(FONT_IMPORT_URL)}");</style></defs>`
       : "";
     const bg = transparent ? "" : `<rect width="${VB_W}" height="${VB_H}" fill="#ffffff"/>`;
     const markup = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${VB_W} ${VB_H}" width="${VB_W}" height="${VB_H}">` +
@@ -1160,9 +1167,37 @@
     return m;
   }
 
-  function exportPNG(scale, view) {
+  /* SVG文字列中の外部画像参照（assets/... 等の商品写真）を data URL に置換。
+   * <img> 経由のラスタライズは外部サブリソースを読み込まないため、
+   * この前処理が無いと写真モックアップのPNG書き出しで写真が抜ける。 */
+  async function inlineExternalImages(markup) {
+    const re = /(?:xlink:href|href)="([^"]+)"/g;
+    const targets = new Set();
+    let m;
+    while ((m = re.exec(markup))) {
+      const u = m[1];
+      if (u && !/^(data:|#|blob:)/.test(u)) targets.add(u);
+    }
+    for (const u of targets) {
+      try {
+        const res = await fetch(u.replace(/&amp;/g, "&"));
+        if (!res.ok) continue;
+        const blob = await res.blob();
+        const dataUrl = await new Promise((ok, ng) => {
+          const r = new FileReader();
+          r.onload = () => ok(r.result);
+          r.onerror = () => ng(r.error);
+          r.readAsDataURL(blob);
+        });
+        markup = markup.split(`"${u}"`).join(`"${dataUrl}"`);
+      } catch (e) { /* 取得できない参照は従来どおりそのまま（イラスト等は影響なし） */ }
+    }
+    return markup;
+  }
+
+  async function exportPNG(scale, view) {
+    const markup = await inlineExternalImages(exportSVG(view, false)); // ラスタライズ用は@import無し
     return new Promise((resolve, reject) => {
-      const markup = exportSVG(view, false); // ラスタライズ用は@import無し
       const blob = new Blob([markup], { type: "image/svg+xml;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const img = new Image();
@@ -1253,7 +1288,8 @@
     },
     toggleWorn() {
       state.worn = !state.worn;
-      if (state.worn) { state.preview = true; state.selectedId = null; } // 着用は仕上がり表示に
+      if (state.worn) { wornPrevPreview = state.preview; state.preview = true; state.selectedId = null; } // 着用は仕上がり表示に
+      else { state.preview = wornPrevPreview; } // OFFで着用前の状態（通常は編集）に戻す
       render();
       callbacks.onSelect(null);
       return state.worn;
