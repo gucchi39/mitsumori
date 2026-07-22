@@ -289,12 +289,42 @@
     return typeof url === "string" && url ? url : null;
   }
 
+  /* ---------------- 写真の自動カラー変更（グレー無地→各色） ----------------
+   * 1枚のグレー無地写真から、選択カラーに応じて色替えした見た目を作る。
+   * 生地のシワ・陰影（＝明度）を保ったまま色相・彩度だけ変える。
+   *   手順: いったんグレースケール化（明度L）→ 目標色でLを着色。
+   *   さらに baseLum（元写真の平均的な明るさ）で割ってスケールするので、
+   *   ネイビー等の濃色は暗く、白等の淡色は明るく、自然に振れる。 */
+  function photoTintFilter(id, colorHex, baseLum) {
+    const n = String(colorHex || "#808080").replace("#", "");
+    const num = parseInt(n.length === 3 ? n.split("").map((x) => x + x).join("") : n, 16);
+    const r = ((num >> 16) & 255) / 255, g = ((num >> 8) & 255) / 255, b = (num & 255) / 255;
+    const Lb = Math.max(0.15, Math.min(0.95, baseLum || 0.55));
+    const gr = r / Lb, gg = g / Lb, gb = b / Lb;            // 各チャンネルのゲイン
+    const lr = 0.2126, lg = 0.7152, lb = 0.0722;            // 輝度係数
+    const m = [
+      gr * lr, gr * lg, gr * lb, 0, 0,
+      gg * lr, gg * lg, gg * lb, 0, 0,
+      gb * lr, gb * lg, gb * lb, 0, 0,
+      0, 0, 0, 1, 0,
+    ].map((v) => Math.round(v * 10000) / 10000).join(" ");
+    return `<filter id="${id}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${m}"/></filter>`;
+  }
+
   /** 商品のモックアップ（写真があれば写真、なければイラスト） */
   function renderProductMockup(product, colorHex, colorId, view) {
     const url = photoFor(product, colorId, view || "front");
     if (url) {
       const e = String(url).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-      return `<g class="mockup"><image href="${e}" xlink:href="${e}" x="0" y="0" width="700" height="760" preserveAspectRatio="xMidYMid meet"/></g>`;
+      const ph = product.photos;
+      let defs = "", fattr = "";
+      /* autoColor: グレー無地写真1枚を選択カラーへ自動で色替え */
+      if (ph && ph.autoColor) {
+        const tid = "ptint-" + String(colorId || "x").replace(/[^a-z0-9_-]/gi, "");
+        defs = `<defs>${photoTintFilter(tid, colorHex, ph.baseLum)}</defs>`;
+        fattr = ` filter="url(#${tid})"`;
+      }
+      return `<g class="mockup">${defs}<image href="${e}" xlink:href="${e}" x="0" y="0" width="700" height="760" preserveAspectRatio="xMidYMid meet"${fattr}/></g>`;
     }
     return renderMockup(product.mockup, colorHex, view);
   }
