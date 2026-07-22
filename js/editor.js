@@ -463,8 +463,18 @@
   function startPinchIfTwo() {
     if (pointers.size !== 2) return false;
     const [a, b] = Array.from(pointers.values());
-    /* オブジェクト操作中に2本目が触れたら、操作を中断してピンチに移行 */
-    drag = null;
+    /* オブジェクト操作中に2本目が触れたら、移動分を onPointerUp と同様に確定してから
+     * ピンチに移行（放置すると interacting が残って質感フィルタが戻らず、
+     * 移動が undo/自動保存/見積もりにも反映されない） */
+    if (drag) {
+      const d = drag;
+      drag = null;
+      dragGuides.v = dragGuides.h = false;
+      const wasInteracting = interacting;
+      interacting = false;
+      if (d.mode !== "pan" && d.moved) commit();
+      else if (wasInteracting) render();
+    }
     dragGuides.v = dragGuides.h = false;
     pinch = {
       startDist: Math.max(10, Math.hypot(a.x - b.x, a.y - b.y)),

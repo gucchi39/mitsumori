@@ -191,7 +191,9 @@
     const ph = product && product.photos;
     if (!ph) return null;
     const set = ph[colorId] && typeof ph[colorId] === "object" ? ph[colorId] : ph;
-    const url = set[view] || set.front;
+    /* 要求された面の写真のみ返す（前面写真を背面に流用しない）。
+     * 無い面は null → イラスト表示＋printAreas にフォールバックする */
+    const url = set[view];
     return typeof url === "string" && url ? url : null;
   }
 

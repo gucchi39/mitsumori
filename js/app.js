@@ -149,6 +149,9 @@
       refreshQuote();
     }
     updateNav();
+    /* スクロールコンテナは <main>（windowではない）なので両方リセット */
+    const m = $("#main");
+    if (m) m.scrollTop = 0;
     window.scrollTo({ top: 0 });
   }
 
@@ -975,23 +978,34 @@
 
   /* ================= チーム名簿（背番号・名前の一括） ================= */
 
-  /* 名簿テキストを [{name, number, size}] に解析 */
+  /* 名簿テキストを [{name, number, size, sizeOk}] に解析。
+   * 表記ゆれは大文字化のみ吸収し、不明なサイズは別サイズへ勝手に置き換えず
+   * sizeOk=false のまま見せて注文をブロックする（誤サイズ製作の防止） */
   function parseRoster(text) {
     const p = Editor.state.product;
     const validSizes = p ? p.sizes : [];
     return String(text || "").split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
       const parts = line.split(/[,、\t]/).map((s) => s.trim());
-      let size = (parts[2] || "").toUpperCase();
-      if (validSizes.length && !validSizes.includes(size)) size = validSizes.includes("FREE") ? "FREE" : validSizes[0];
-      return { name: parts[0] || "", number: parts[1] || "", size };
+      const raw = (parts[2] || "").toUpperCase();
+      let size = raw, sizeOk = true;
+      if (validSizes.length) {
+        if (validSizes.includes(raw)) size = raw;
+        else if (!raw && validSizes.includes("FREE")) size = "FREE"; // サイズ欄なし×フリーサイズ商品はOK
+        else sizeOk = false;
+      }
+      return { name: parts[0] || "", number: parts[1] || "", size, sizeOk };
     });
   }
 
-  /* 名簿からサイズ別数量を集計 */
+  /* 名簿からサイズ別数量を集計（サイズ不明の行は数えない） */
   function rosterQuantities() {
     const q = {};
-    for (const e of app.roster.entries) q[e.size] = (q[e.size] || 0) + 1;
+    for (const e of app.roster.entries) if (e.sizeOk !== false) q[e.size] = (q[e.size] || 0) + 1;
     return q;
+  }
+
+  function rosterBadRows() {
+    return app.roster.entries.map((e, i) => ({ ...e, row: i + 1 })).filter((e) => e.sizeOk === false);
   }
 
   function rosterActive() {
@@ -1055,9 +1069,19 @@
     /* テーブル表示 */
     $("#rosterTable").innerHTML = n
       ? `<table><thead><tr><th>#</th><th>名前</th><th>番号</th><th>サイズ</th></tr></thead><tbody>${
-          app.roster.entries.map((e, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(e.name)}</td><td>${escapeHtml(e.number)}</td><td>${escapeHtml(e.size)}</td></tr>`).join("")
+          app.roster.entries.map((e, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(e.name)}</td><td>${escapeHtml(e.number)}</td><td>${
+            e.sizeOk === false
+              ? `<b style="color:#d33">⚠ ${escapeHtml(e.size) || "未入力"}</b>`
+              : escapeHtml(e.size)
+          }</td></tr>`).join("")
         }</tbody></table>`
       : "";
+
+    const bad = rosterBadRows();
+    if (bad.length) {
+      const p = Editor.state.product;
+      $("#rosterTable").insertAdjacentHTML("afterbegin", `<div class="alert warn" style="margin-bottom:8px">⚠ サイズが不明な行があります（${bad.map((b) => `${b.row}行目`).join("・")}）。この商品のサイズ：<b>${(p ? p.sizes : []).map(escapeHtml).join(" / ")}</b>。修正されるまでこの行は数量に含まれず、ご注文に進めません。</div>`);
+    }
 
     if (active && !hasPlaceholders()) {
       $("#rosterTable").insertAdjacentHTML("afterbegin", `<div class="alert warn" style="margin-bottom:8px">⚠ デザインに <code>{名前}</code> または <code>{番号}</code> が見つかりません。STEP2でテキストに差し込み文字を入れてください（例：背番号のテキストを「{番号}」に）。</div>`);
@@ -1273,6 +1297,10 @@
     const eq = effectiveQuantities();
     const totalQty = p ? p.sizes.reduce((s, sz) => s + cleanQty(eq[sz]), 0) : 0;
     if (totalQty < 1) errs.push(rosterActive() ? "名簿が空です。名前・番号・サイズを入力してください。" : "数量が入力されていません。");
+    if (rosterActive()) {
+      const bad = rosterBadRows();
+      if (bad.length) errs.push(`名簿にサイズが不明な行が${bad.length}行あります（${bad.map((b) => `${b.row}行目「${b.size || "未入力"}」`).join("、")}）。この商品のサイズ：${p ? p.sizes.join(" / ") : ""}`);
+    }
     const c = contactInfo();
     if (!c.name) errs.push("お名前を入力してください。");
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(c.email)) errs.push("有効なメールアドレスを入力してください。");
@@ -1347,6 +1375,38 @@
     return files;
   }
 
+  /* 依存ライブラリ無しの ZIP 生成（無圧縮/store方式・ファイル名UTF-8フラグ付き）。
+   * web3forms が複数添付に対応していないため、入稿ファイル一式を1つに束ねる用途 */
+  async function zipStore(files) {
+    const enc = new TextEncoder();
+    const T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+    const crc32 = (u8) => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = T[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+    const u16 = (v) => new Uint8Array([v & 255, (v >> 8) & 255]);
+    const u32 = (v) => new Uint8Array([v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255]);
+    const d = new Date();
+    const dosTime = ((d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1)) & 0xFFFF;
+    const dosDate = (((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()) & 0xFFFF;
+    const parts = [], central = [];
+    let offset = 0;
+    for (const f of files) {
+      const data = new Uint8Array(await f.blob.arrayBuffer());
+      const name = enc.encode(f.name);
+      const crc = crc32(data);
+      parts.push(u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(dosTime), u16(dosDate),
+        u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), name, data);
+      central.push({ name, crc, size: data.length, offset });
+      offset += 30 + name.length + data.length;
+    }
+    const cdStart = offset;
+    for (const e of central) {
+      parts.push(u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0), u16(dosTime), u16(dosDate),
+        u32(e.crc), u32(e.size), u32(e.size), u16(e.name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(e.offset), e.name);
+      offset += 46 + e.name.length;
+    }
+    parts.push(u32(0x06054b50), u16(0), u16(0), u16(central.length), u16(central.length), u32(offset - cdStart), u32(cdStart), u16(0));
+    return new Blob(parts, { type: "application/zip" });
+  }
+
   async function postOrder(order, files) {
     const fd = new FormData();
     fd.append("orderNo", order.orderNo);
@@ -1355,7 +1415,14 @@
     fd.append("email", order.contact.email);
     fd.append("_replyto", order.contact.email);
     if (CONFIG.ORDER.provider === "web3forms" && CONFIG.ORDER.accessKey) fd.append("access_key", CONFIG.ORDER.accessKey);
-    if (CONFIG.ORDER.attachFiles) for (const f of files) fd.append("attachment", f.blob, f.name);
+    if (CONFIG.ORDER.attachFiles && files.length) {
+      if (CONFIG.ORDER.provider === "web3forms" && files.length > 1) {
+        /* web3forms は添付1つのみ対応 → ZIPに束ねて送る */
+        fd.append("attachment", await zipStore(files), `${order.orderNo}_入稿データ.zip`);
+      } else {
+        for (const f of files) fd.append("attachment", f.blob, f.name);
+      }
+    }
     const res = await fetch(CONFIG.ORDER.endpoint, { method: "POST", body: fd, headers: { Accept: "application/json" } });
     return res.ok;
   }

@@ -10,12 +10,15 @@ permissions:
   pages: write
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: true
-
 jobs:
   deploy:
+    # 本番Pagesへ出すのは「リポジトリのデフォルトブランチ」への push のみ。
+    # （現在は作業ブランチがデフォルト。main をデフォルトに切り替えた後は
+    #   自動的に main のみがデプロイされ、他ブランチの push は無視される）
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch
+    concurrency:
+      group: pages
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     environment:
       name: github-pages
