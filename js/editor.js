@@ -103,6 +103,27 @@
     return null;
   }
   /* designs 全体を無害化。未知の methodId は先頭の対応方法へ寄せる */
+  /* 保存データのエリア座標が現行と食い違う場合の救済：
+   * あるエリアのオブジェクト群の中心がそのプリント範囲から大きく外れていたら、
+   * 相対配置を保ったまま範囲中央へ平行移動する（クリップで消えるのを防ぐ）。 */
+  function migrateOffAreaObjects(product) {
+    const areas = [...(product.printAreas || []), ...(product.photoAreas || [])];
+    const areaById = {};
+    for (const a of areas) if (!areaById[a.id]) areaById[a.id] = a;
+    for (const [areaId, d] of Object.entries(state.designs || {})) {
+      const a = areaById[areaId];
+      if (!a || !d.objects || !d.objects.length) continue;
+      let sx = 0, sy = 0;
+      for (const o of d.objects) { sx += n(o.x); sy += n(o.y); }
+      const avgX = sx / d.objects.length, avgY = sy / d.objects.length;
+      const mx = a.w * 0.1, my = a.h * 0.1;
+      const outside = avgX < a.x - mx || avgX > a.x + a.w + mx || avgY < a.y - my || avgY > a.y + a.h + my;
+      if (!outside) continue;
+      const dx = (a.x + a.w / 2) - avgX, dy = (a.y + a.h / 2) - avgY;
+      for (const o of d.objects) { o.x = n(o.x) + dx; o.y = n(o.y) + dy; }
+    }
+  }
+
   function sanitizeDesigns(rawDesigns, product) {
     const clean = {};
     const validAreas = new Set([...(product.printAreas||[]), ...(product.photoAreas||[])].map((a) => a.id));
@@ -883,9 +904,15 @@
   }
 
   /** 各プリント位置の見積もり用サマリを返す */
-  function getPlacements() {
+  function getPlacements(designsObj) {
     if (!state.product) return [];
-    return withVisibleStage(getPlacementsInner);
+    return withVisibleStage(() => {
+      if (!designsObj) return getPlacementsInner();
+      /* 別のデザイン集合（名簿の差し込み済み等）で採寸する */
+      const saved = state.designs;
+      state.designs = designsObj;
+      try { return getPlacementsInner(); } finally { state.designs = saved; }
+    });
   }
 
   function getPlacementsInner() {
@@ -1337,6 +1364,9 @@
       state.colorId = product.colors.some((c) => c.id === data.colorId) ? data.colorId : product.colors[0].id;
       /* 信頼できない入力を無害化してから採用（XSS・不正値・未知methodId対策） */
       state.designs = sanitizeDesigns(data.designs, product);
+      /* 旧バージョンとの互換：エリア座標が変わった（袖ビュー化など）場合、
+       * プリント範囲の外に取り残されたオブジェクトを範囲内へ移動して救済する */
+      migrateOffAreaObjects(product);
       state.areaId = data.areaId && productAreas(product).some((a) => a.id === data.areaId)
         ? data.areaId : productAreas(product)[0].id;
       state.selectedId = null;

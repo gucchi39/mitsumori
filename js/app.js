@@ -639,10 +639,30 @@
     return rosterActive() ? rosterQuantities() : app.quantities;
   }
 
+  /* 名簿使用時の最悪ケース採寸：差し込み前テンプレ（{名前}/{番号}）ではなく、
+   * 全メンバーの実際の名前・番号に差し替えた各案を測り、エリアごとに最大サイズを採る。
+   * 長い名前がプリント範囲を超える／上のサイズ区分に入る場合も見積・警告へ反映する。 */
+  function rosterMaxPlacements(base) {
+    const byArea = {};
+    for (const pl of base) byArea[pl.areaId] = { ...pl };
+    const entries = app.roster.entries.filter((e) => e.sizeOk !== false).slice(0, 60); // 上限で保護
+    for (const e of entries) {
+      const pls = Editor.getPlacements(memberDesigns(e));
+      for (const pl of pls) {
+        const b = byArea[pl.areaId];
+        if (!b) { byArea[pl.areaId] = { ...pl }; continue; }
+        b.widthMm = Math.max(b.widthMm, pl.widthMm);
+        b.heightMm = Math.max(b.heightMm, pl.heightMm);
+      }
+    }
+    return Object.values(byArea);
+  }
+
   function refreshQuote() {
     const p = Editor.state.product;
     if (!p) return;
-    const placements = Editor.getPlacements();
+    let placements = Editor.getPlacements();
+    if (rosterActive() && hasPlaceholders()) placements = rosterMaxPlacements(placements);
     const q = Quote.computeQuote({
       productId: p.id,
       quantities: effectiveQuantities(),
@@ -717,7 +737,8 @@
       alert("先に数量を入力してください。");
       return;
     }
-    const placements = Editor.getPlacements();
+    let placements = Editor.getPlacements();
+    if (rosterActive() && hasPlaceholders()) placements = rosterMaxPlacements(placements);
     const now = new Date();
     const ymd = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日`;
     const no = `Q${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
@@ -1170,6 +1191,11 @@
     let n = 0;
 
     if (rosterActive()) {
+      /* 注文と同じ名簿バリデーションを通す（差し込み文字なし＝全員同一SVG、
+       * サイズ不明行＝見積から除外した行の書き出しを防ぐ） */
+      if (!hasPlaceholders()) { toast("名簿を使う場合は、デザインに {名前} または {番号} を入れてください", "warn"); return; }
+      const bad = rosterBadRows();
+      if (bad.length) { toast(`名簿のサイズが不明な行があります（${bad.map((b) => `${b.row}行目`).join("・")}）。修正してください`, "warn"); return; }
       /* 名簿：メンバーごとに差し込み済みの入稿SVGを書き出す */
       app.roster.entries.forEach((e, i) => {
         const dsn = memberDesigns(e);
@@ -1435,7 +1461,17 @@
       }
     }
     const res = await fetch(CONFIG.ORDER.endpoint, { method: "POST", body: fd, headers: { Accept: "application/json" } });
-    return res.ok;
+    if (!res.ok) return false;
+    /* web3forms / formspree 等は HTTP 200 でも本文で失敗を返すことがある
+     * （例: {success:false}）。JSON を見て成功フラグも確認する。 */
+    try {
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      if (ct.includes("application/json")) {
+        const j = await res.json();
+        if (j && (j.success === false || j.ok === false || j.status === "error")) return false;
+      }
+    } catch (e) { /* JSON でなければ HTTP ステータスを信頼 */ }
+    return true;
   }
 
   function openMailFallback(order, files) {
@@ -1561,12 +1597,16 @@
       const data = JSON.parse(json);
       /* 共有デザインの読み込みで、閲覧者が作業中の自動保存を消さない
        * （実際に編集を始めるまで autosave をロックする） */
+      /* 共有デザインの読み込みで、受け手の作業中データ（自動保存）を消さない。
+       * shareLocked の間は自動保存をスキップし、受け手が実際に編集を始めた最初の
+       * 変更でロック解除して保存する。shareLoadPending は「読込そのものが起こす
+       * 変更（＝保存すべきでない）」を1回だけ読み飛ばすための目印。
+       * ※onChange は 60ms デバウンスされるため、ここでの単純な cancel では防げない。 */
       shareLocked = true;
-      if (!Editor.load(data)) { shareLocked = false; return false; }
+      shareLoadPending = true;
+      if (!Editor.load(data)) { shareLocked = false; shareLoadPending = false; return false; }
       app.quantities = cleanQuantities(data.quantities || data.q);
       /* 共有リンクには個人情報を含めない方針のため、連絡先は復元しない */
-      ["pointerdown", "keydown"].forEach((ev) =>
-        document.addEventListener(ev, function unlock() { shareLocked = false; document.removeEventListener(ev, unlock); }, { once: true }));
       goStep(2);
       renderEditorPanels();
       /* 取り込み後はURLからハッシュを除去：このURLを再読み込みしても
@@ -1585,9 +1625,16 @@
   /* ================= 自動保存 ================= */
 
   let shareLocked = false;
+  let shareLoadPending = false;
 
   const autosave = debounce(() => {
-    if (!Editor.state.product || shareLocked) return;
+    if (!Editor.state.product) return;
+    /* 共有リンクを開いた直後のガード：読込自体が起こす変更は保存せず、
+     * 受け手の実際の編集（次の変更）でロックを解除して保存する。 */
+    if (shareLocked) {
+      if (shareLoadPending) { shareLoadPending = false; return; }
+      shareLocked = false;
+    }
     try {
       localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
         editor: Editor.serialize(),
