@@ -124,6 +124,31 @@
     }
   }
 
+  /* 色替えで実効版面が入れ替わった（photoAreas ⇄ printAreas）エリアの
+   * オブジェクトを、旧版面→新版面へ相対位置を保って写像する。
+   * 色別写真の商品では photoFor が colorId に依存するため、写真の無い色へ
+   * 切り替えると版面ジオメトリが変わる。座標を放置すると見切れ・クリップ・
+   * 採寸ズレになる（Codex指摘）。px/mm 比も版面ごとに違うため scale も補正し、
+   * 実寸(mm)は変えない。 */
+  function remapDesignsForAreaChange(before, after) {
+    for (const a2 of after) {
+      const a1 = before.find((b) => b.id === a2.id);
+      if (!a1) continue;
+      if (a1.x === a2.x && a1.y === a2.y && a1.w === a2.w && a1.h === a2.h) continue;
+      const d = state.designs[a2.id];
+      if (!d || !d.objects || !d.objects.length) continue;
+      const rw = (a2.w / (a2.mmW || 1)) / (a1.w / (a1.mmW || 1));
+      const rh = (a2.h / (a2.mmH || 1)) / (a1.h / (a1.mmH || 1));
+      const r = (rw + rh) / 2;
+      for (const o of d.objects) {
+        const fx = (n(o.x) - a1.x) / a1.w, fy = (n(o.y) - a1.y) / a1.h;
+        o.x = a2.x + fx * a2.w;
+        o.y = a2.y + fy * a2.h;
+        o.scale = Math.max(0.05, n(o.scale) * r);
+      }
+    }
+  }
+
   function sanitizeDesigns(rawDesigns, product) {
     const clean = {};
     const validAreas = new Set([...(product.printAreas||[]), ...(product.photoAreas||[])].map((a) => a.id));
@@ -1297,7 +1322,11 @@
     },
 
     setBodyColor(colorId) {
+      /* 色別写真の商品では色替えで実効版面が変わり得る。変わったエリアは
+       * オブジェクトを新版面へ写像してから描画する（見切れ・採寸ズレ防止） */
+      const before = productAreas().map((a) => ({ id: a.id, x: a.x, y: a.y, w: a.w, h: a.h, mmW: a.mmW, mmH: a.mmH }));
       state.colorId = colorId;
+      remapDesignsForAreaChange(before, productAreas());
       render();
       callbacks.onChange();
     },

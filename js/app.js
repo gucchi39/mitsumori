@@ -205,6 +205,7 @@
     if (!Editor.state.product || Editor.state.product.id !== p.id) {
       Editor.setProduct(p);
       app.quantities = {};
+      app.orderNo = null; /* 別商品＝別注文。番号を発番し直す */
     }
     goStep(2);
   }
@@ -583,6 +584,11 @@
   /* ================= エディタコールバック ================= */
 
   function onEditorChange() {
+    /* デザインが変わったら注文番号を発番し直す（前のデザインで発番した番号を
+     * 別内容の注文・入稿ファイル名に使い回すと、店舗側の追跡で衝突するため）。
+     * 同一デザインのままなら番号は維持され、mailtoフォールバックの再送や
+     * 「入稿データ書き出し→そのまま注文」では同じ番号で一致する。 */
+    app.orderNo = null;
     renderPositionBar();
     renderLayerList();
     renderAreaInfo();
@@ -900,7 +906,11 @@
   function buildOrder() {
     const p = Editor.state.product;
     const q = app.lastQuote;
-    const placements = Editor.getPlacements();
+    /* 名簿有効時は {名前}/{番号} を全員分に差し替えた最悪ケース寸法で報告する。
+     * 見積（refreshQuote）と同じ展開をしないと、添付の個別SVGや請求根拠より
+     * 小さい寸法がメール・JSONに記載され、超過警告も欠落してしまう */
+    let placements = Editor.getPlacements();
+    if (rosterActive() && hasPlaceholders()) placements = rosterMaxPlacements(placements);
     const color = p.colors.find((c) => c.id === Editor.state.colorId);
     const eq = effectiveQuantities();
     const sizes = p.sizes.filter((s) => eq[s] > 0).map((s) => ({ size: s, qty: eq[s] }));
@@ -986,6 +996,7 @@
       try {
         const data = JSON.parse(reader.result);
         if (!Editor.load(data.editor)) throw new Error("bad data");
+        app.orderNo = null; /* 読み込んだデザインは別注文として発番し直す */
         app.quantities = cleanQuantities(data.quantities);
         applyContact(data.contact);
         restoreRoster(data.roster);
@@ -1254,7 +1265,9 @@
   function specSheetHTML() {
     const order = buildOrder();
     const p = Editor.state.product;
-    const placements = Editor.getPlacements();
+    /* 指示書の仕上がり実寸・製造警告も注文データと同じ名簿展開寸法で出す */
+    let placements = Editor.getPlacements();
+    if (rosterActive() && hasPlaceholders()) placements = rosterMaxPlacements(placements);
     const warns = productionWarnings(placements);
 
     const sections = placements.map((pl) => {
@@ -1635,6 +1648,7 @@
       shareLocked = true;
       shareLoadPending = true;
       if (!Editor.load(data)) { shareLocked = false; shareLoadPending = false; return false; }
+      app.orderNo = null; /* 共有から読み込んだデザインは別注文として発番し直す */
       app.quantities = cleanQuantities(data.quantities || data.q);
       /* 共有リンクには個人情報を含めない方針のため、連絡先は復元しない */
       goStep(2);

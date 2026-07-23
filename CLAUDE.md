@@ -36,6 +36,8 @@
   towel は対象外（イラストのみ）。drytshirt は定番Tと同形状のため写真を流用。
 - 元画像は `assets/products/src_*`（ユーザーがGitHub Web UIでアップロード。**コミット未完了のことがある**ので
   「アップした」と言われたら `git fetch` で確認し、無ければ「Commit changes を押したか」を確認する）。
+  `src_*` は **Pagesアーティファクトから除外**（deploy-pages.yml の rsync ステージング）。サイト参照ファイルだけが
+  デプロイされる。過去の元画像・旧アセットはツリーに置かず、必要なら git 履歴から（`git show <sha>:"<path>" > f.png`）。
 
 ### 写真を追加するときのパイプライン（確立済み）
 
@@ -75,6 +77,14 @@
   （`shareLocked`/`shareLoadPending`。受け手の実編集で初めて解除）。タイミング依存の実装に戻さない。
 - web3forms は添付1つのみ → 依存無しZIP（`zipStore`・store方式）に束ねる。
 - 注文番号は `ORD-YYYYMMDD-HHMMSS-NNN`（crypto乱数）。`Date.now()%9000` に戻さない。
+  **キャッシュ（app.orderNo）はデザイン変更・商品切替・読込・共有読込でリセット**（onEditorChange等）。
+  同一デザインなら番号維持（mailto再送・入稿書き出し→注文の一致のため）。常時再発番にしない。
+- **注文メタデータ（buildOrder）と指示書（specSheetHTML）の採寸も名簿展開する**
+  （rosterActive&&hasPlaceholders なら rosterMaxPlacements）。見積だけ展開して
+  メール/JSON/指示書が {名前} のままの小さい寸法になっていた（Codex 8巡目指摘・修正済み）。
+- **色別写真（photos[colorId]={...}）の商品は、色替えで実効版面が変わる**。
+  `setBodyColor` が版面ジオメトリの変化を検知し `remapDesignsForAreaChange` で
+  オブジェクトを新版面へ写像（相対位置維持・px/mm補正で実寸不変）。この仕組みを壊さない。
 - E2Eの共有リンクテストは **送信側と別の browser context** で開く（同一contextだとlocalStorageを共有して偽陽性）。
 
 ## その他

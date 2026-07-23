@@ -30,10 +30,22 @@ jobs:
         uses: actions/configure-pages@v5
         with:
           enablement: true
+      # サイトが参照するファイルだけを別ディレクトリに集めてアップロードする。
+      # assets/products/src_* は写真再処理用の元画像（数十MB）で、サイトからは
+      # 未参照のため除外（毎回のアーティファクトを小さく・デプロイを速く保つ）。
+      - name: Stage site files (exclude photo sources)
+        run: |
+          mkdir -p /tmp/site
+          rsync -a \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'tests' \
+            --exclude 'assets/products/src_*' \
+            ./ /tmp/site/
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: /tmp/site
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
