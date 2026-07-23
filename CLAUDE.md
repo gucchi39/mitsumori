@@ -81,8 +81,17 @@
   （`shareLocked`/`shareLoadPending`。受け手の実編集で初めて解除）。タイミング依存の実装に戻さない。
 - web3forms は添付1つのみ → 依存無しZIP（`zipStore`・store方式）に束ねる。
 - 注文番号は `ORD-YYYYMMDD-HHMMSS-NNN`（crypto乱数）。`Date.now()%9000` に戻さない。
-  **キャッシュ（app.orderNo）はデザイン変更・商品切替・読込・共有読込でリセット**（onEditorChange等）。
-  同一デザインなら番号維持（mailto再送・入稿書き出し→注文の一致のため）。常時再発番にしない。
+  **リセットは「デザイン内容の指紋（designSignature）が変わったときだけ」**（Codex 9巡目）。
+  onEditorChange は位置タブ切替でも発火するため、無条件リセットにすると
+  「入稿書き出し→位置を眺める→注文」で番号がズレる。指紋は商品/色/designs
+  （画像hrefは長さ+先頭48字に短縮してstringify）。商品切替・読込・共有読込は明示リセット。
+- **注文添付には指示書HTML（specSheetHTML）も同梱**（buildOrderFiles・名簿モード含む）。
+  店舗が受け取る製作情報の本体。SVG/PNG/JSONだけに戻さない。
+- **刺繍の潰れ判定（minTextMm）は1文字の高さ**：複数行は行数、縦書きは1列の文字数で
+  bb.h を割る。ブロック全体の高さでは複数行の小文字を見逃す。
+- **背景透過で縮小（長辺1600px超）したら natW/natH も更新**（app.js bindBgRemove）。
+  据え置くとDPI計算が過大になり低解像度警告が消える。「元に戻す」はhref+natW/natHのセットで復元。
+- **setup.html のテスト送信も postOrder と同じJSON成功判定**（success/ok/status）。res.okだけに戻さない。
 - **注文メタデータ（buildOrder）と指示書（specSheetHTML）の採寸も名簿展開する**
   （rosterActive&&hasPlaceholders なら rosterMaxPlacements）。見積だけ展開して
   メール/JSON/指示書が {名前} のままの小さい寸法になっていた（Codex 8巡目指摘・修正済み）。

@@ -159,9 +159,21 @@
       fd.append("email", ORDER.toEmail || SHOP.email || "");
       if (ORDER.provider === "web3forms" && ORDER.accessKey) fd.append("access_key", ORDER.accessKey);
       const res = await fetch(ORDER.endpoint, { method: "POST", body: fd, headers: { Accept: "application/json" } });
-      out.innerHTML = res.ok
+      /* 本番の注文送信（postOrder）と同じ判定：HTTP 200 でも本文が
+       * {success:false} 等ならエラー扱いにする（web3forms等は200で失敗を返す） */
+      let bodyOk = true, providerMsg = "";
+      try {
+        const j = await res.clone().json();
+        if (j && (j.success === false || j.ok === false || j.status === "error")) {
+          bodyOk = false;
+          providerMsg = String(j.message || j.error || "サービス側が失敗を返しました");
+        }
+      } catch (e) { /* JSONでない応答はHTTPステータスのみで判定 */ }
+      out.innerHTML = (res.ok && bodyOk)
         ? '<span style="color:var(--ok)">✅ 送信成功。受信メールボックスをご確認ください。</span>'
-        : `<span style="color:var(--err)">✕ 送信失敗（HTTP ${res.status}）。エンドポイントURL・プラン制限をご確認ください。</span>`;
+        : (res.ok
+          ? `<span style="color:var(--err)">✕ 送信失敗（${providerMsg}）。アクセスキー・設定をご確認ください。</span>`
+          : `<span style="color:var(--err)">✕ 送信失敗（HTTP ${res.status}）。エンドポイントURL・プラン制限をご確認ください。</span>`);
     } catch (e) {
       out.innerHTML = '<span style="color:var(--err)">✕ 送信エラー（ネットワーク/CORS）。URLが正しいかご確認ください。</span>';
     }

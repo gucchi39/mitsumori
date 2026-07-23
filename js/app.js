@@ -592,15 +592,17 @@
       btn.disabled = false; btn.textContent = "✨ 背景を消す";
       if (!res || res.removedPct === 0) { toast("背景らしい部分が見つかりませんでした（すでに透過済みの画像かもしれません）", "warn"); return; }
       if (res.removedPct > 92) { toast("画像のほぼ全体が背景と判定されたため中止しました。「弱」でお試しください", "warn"); return; }
-      if (!app.bgBackup[selImg.id]) app.bgBackup[selImg.id] = selImg.href;
-      Editor.updateSelected({ href: res.dataUrl });
+      if (!app.bgBackup[selImg.id]) app.bgBackup[selImg.id] = { href: selImg.href, natW: selImg.natW, natH: selImg.natH };
+      /* 長辺1600px超は処理時に縮小されるため、natW/natH も実データに合わせて更新する。
+       * 据え置くと getPlacements の実効DPI計算が過大になり、低解像度警告が出なくなる */
+      Editor.updateSelected({ href: res.dataUrl, natW: res.w, natH: res.h });
       renderToolPanel();
       toast(`背景を透過しました（画像の約${res.removedPct}%）。戻すときは「元に戻す」へ`);
     });
     if (restore) restore.addEventListener("click", () => {
       const orig = app.bgBackup[selImg.id];
       if (!orig) return;
-      Editor.updateSelected({ href: orig });
+      Editor.updateSelected({ href: orig.href, natW: orig.natW, natH: orig.natH });
       delete app.bgBackup[selImg.id];
       renderToolPanel();
       toast("元の画像に戻しました");
@@ -723,12 +725,25 @@
 
   /* ================= エディタコールバック ================= */
 
+  /* デザイン内容の指紋。商品・色・全プリント位置のオブジェクト構成が対象。
+   * 画像の href（dataURLで巨大）は長さ＋先頭で代用し、毎回の全文比較を避ける */
+  function designSignature() {
+    try {
+      const p = Editor.state.product;
+      return (p ? p.id : "") + "|" + Editor.state.colorId + "|" +
+        JSON.stringify(Editor.serialize().designs, (k, v) =>
+          (k === "href" && typeof v === "string") ? v.length + ":" + v.slice(0, 48) : v);
+    } catch (e) { return "err" + Date.now(); }
+  }
+
   function onEditorChange() {
-    /* デザインが変わったら注文番号を発番し直す（前のデザインで発番した番号を
-     * 別内容の注文・入稿ファイル名に使い回すと、店舗側の追跡で衝突するため）。
-     * 同一デザインのままなら番号は維持され、mailtoフォールバックの再送や
-     * 「入稿データ書き出し→そのまま注文」では同じ番号で一致する。 */
-    app.orderNo = null;
+    /* デザインの中身が変わったときだけ注文番号を発番し直す（別内容の注文に
+     * 同じ番号が使い回されると店舗側の追跡で衝突するため）。プリント位置の
+     * タブ切替などデザインが変わらない操作では番号を維持し、
+     * 「入稿データ書き出し→位置を眺めて→注文」でも番号が一致するようにする。 */
+    const sig = designSignature();
+    if (app.lastDesignSig !== undefined && sig !== app.lastDesignSig) app.orderNo = null;
+    app.lastDesignSig = sig;
     renderPositionBar();
     renderLayerList();
     renderAreaInfo();
@@ -1700,6 +1715,11 @@
         }
       });
     }
+    /* 入稿指示書（加工方法・色版/糸色・実寸・白下地警告・名簿一覧）も必ず添付する。
+     * 店舗が受け取る製作情報の本体であり、手動書き出しと注文送信で内容を揃える */
+    try {
+      files.push({ name: `${order.orderNo}_指示書.html`, blob: new Blob([specSheetHTML()], { type: "text/html" }) });
+    } catch (e) { /* 指示書生成失敗でも注文本文・他の添付は送る */ }
     const json = JSON.stringify({ app: "mitsumori", version: 2, order, editor: Editor.serialize() });
     files.push({ name: `${order.orderNo}_design.json`, blob: new Blob([json], { type: "application/json" }) });
     return files;

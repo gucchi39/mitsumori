@@ -1017,7 +1017,14 @@
           if (o.fill) colors.add(String(o.fill).toLowerCase());
           if (o.type === "text" && o.strokeWidth > 0 && o.stroke) colors.add(String(o.stroke).toLowerCase());
           if (o.type === "text") {
-            const hMm = (bb.h) / pxPerMm; // 文字全体の高さ。単純化のため行高で近似
+            /* 刺繍の潰れ判定は「1文字の高さ」で行う。bb.h はテキストブロック全体
+             * の高さのため、複数行なら行数で、縦書きなら1列の文字数で割って近似
+             * する（ブロックが5mm超でも各文字が5mm未満なら実際には潰れる） */
+            const lines = String(o.text || "").split("\n").filter((s) => s.length);
+            const divisor = o.vertical
+              ? Math.max(1, lines.reduce((m, s) => Math.max(m, s.length), 1))
+              : Math.max(1, lines.length);
+            const hMm = (bb.h / divisor) / pxPerMm;
             minTextMm = Math.min(minTextMm, hMm);
           }
         }
