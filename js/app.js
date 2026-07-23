@@ -642,19 +642,25 @@
   }
 
   /* 最悪ケース採寸の対象メンバー。
-   * 通常規模（48名以下）は全員を採寸して確実に最大サイズを拾う。
-   * 大規模名簿では、差し込み文字が最長になる案（名前・番号・両者合計の
-   * それぞれ上位）だけを採寸対象にする。位置ではなく「長さ」で選ぶので、
-   * 何名いても最長の名前・番号を取りこぼさない（＝61人目以降に最長がいても
-   * 見積サイズ・超過警告に反映される）。比例フォント幅のブレも上位複数で吸収。 */
+   * 通常規模（60名以下）は全員を採寸して確実に最大サイズを拾う。
+   * 大規模名簿では、差し込み後の「実レンダリング幅」で候補を選ぶ。文字数ではなく
+   * 実際の描画幅（canvas measureText＝描画と同じ字形メトリクス）で並べるので、
+   * 比例フォントで幅広グリフ（例: W）が少数でも、その行が最大幅なら確実に選ばれる。
+   * 縦書き・複数オブジェクト等の取りこぼし対策に、文字数上位も併せて採る。 */
   function rosterMeasureEntries() {
     const valid = app.roster.entries.filter((e) => e.sizeOk !== false);
-    if (valid.length <= 48) return valid;
-    const K = 12;
-    const nlen = (e) => (e.name || "").length;
-    const mlen = (e) => String(e.number || "").length;
+    if (valid.length <= 60) return valid;
+    const base = Editor.serialize().designs || {};
+    const textObjs = [];
+    for (const areaId in base) for (const o of (base[areaId].objects || []))
+      if (o.type === "text" && /\{(名前|NAME|番号|NUMBER|背番号)\}/i.test(o.text || "")) textObjs.push(o);
+    const ctx = document.createElement("canvas").getContext("2d");
+    const fontOf = (o) => { const f = CONFIG.FONTS.find((x) => x.id === o.fontId) || {}; return `${f.weight || 400} ${(o.fontSize || 40)}px ${f.family || "sans-serif"}`; };
+    const widthOf = (e) => { let w = 0; for (const o of textObjs) { ctx.font = fontOf(o); w = Math.max(w, ctx.measureText(substituteText(o.text, e)).width * (o.scale || 1)); } return w; };
+    const lenOf = (e) => (e.name || "").length + String(e.number || "").length;
+    const K = 40;
     const top = (keyFn) => [...valid].sort((a, b) => keyFn(b) - keyFn(a)).slice(0, K);
-    return [...new Set([...top(nlen), ...top(mlen), ...top((e) => nlen(e) + mlen(e))])];
+    return [...new Set([...top(widthOf), ...top(lenOf)])];
   }
 
   /* 名簿使用時の最悪ケース採寸：差し込み前テンプレ（{名前}/{番号}）ではなく、

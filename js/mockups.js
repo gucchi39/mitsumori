@@ -318,9 +318,13 @@
       const e = String(url).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
       const ph = product.photos;
       let defs = "", fattr = "";
-      /* autoColor: グレー無地写真1枚を選択カラーへ自動で色替え */
+      /* autoColor: グレー無地写真1枚を選択カラーへ自動で色替え。
+       * フィルタIDは商品・面・色で一意にする。SVGのfragment IDは文書全体で
+       * 解決されるため、id が "ptint-white" のように商品間で重複すると、
+       * 後続商品の url(#ptint-white) が先頭商品（baseLumが別）のフィルタに
+       * 解決されて色が崩れる（例：白ポロがTシャツのbaseLumで色替えされ白飛び）。 */
       if (ph && ph.autoColor) {
-        const tid = "ptint-" + String(colorId || "x").replace(/[^a-z0-9_-]/gi, "");
+        const tid = "ptint-" + String((product.id || "p") + "-" + (view || "front") + "-" + (colorId || "x")).replace(/[^a-z0-9_-]/gi, "");
         defs = `<defs>${photoTintFilter(tid, colorHex, ph.baseLum)}</defs>`;
         fattr = ` filter="url(#${tid})"`;
       }
