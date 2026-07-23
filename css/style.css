@@ -1,18 +1,29 @@
 /* =========================================================================
  * style.css — デザインシミュレーター UI
- * アクセント色などは :root の変数で変更できます。
+ * ブランド方針（2026-07 デザイン刷新）:
+ *   「藍色（インディゴ）× 金糸 × 生成り」＋ なみ縫いステッチ点線モチーフ。
+ *   刺繍糸と生地の世界観で、参考にした他社シミュレーターの
+ *   オレンジ×白の印象から視覚的に完全に切り離す。構成・クラス名は不変。
  * ========================================================================= */
 :root {
-  --accent: #ff6a13;            /* メインアクセント（オレンジ） */
-  --accent-dark: #e05a08;
-  --ink: #232a35;
-  --sub: #6b7686;
-  --line: #dde2ea;
-  --bg: #f4f6f9;
-  --panel: #ffffff;
-  --rail: #2b2f36;
-  --radius: 10px;
-  --shadow: 0 2px 10px rgba(25, 35, 55, 0.08);
+  --accent: #2c4e79;            /* 藍（メイン。ボタン・選択状態） */
+  --accent-dark: #22406a;
+  --gold: #c69a35;              /* 金糸（強調・ステッチ点線・合計金額） */
+  --gold-dark: #a37c22;
+  --gold-bright: #edc158;       /* 濃紺の上で使う明るい金 */
+  --tint: #f7f0dd;              /* 選択状態の生成り金ハイライト */
+  --tint-blue: #edf2f8;         /* 藍の淡いハイライト */
+  --ink: #29303b;
+  --sub: #6a7480;
+  --line: #ded9cb;
+  --bg: #f4f1e8;                /* 生成り（未晒しの布） */
+  --panel: #fffdf8;
+  --rail: #223049;              /* 左ツールレールは濃藍 */
+  --radius: 8px;
+  --shadow: 0 2px 10px rgba(60, 52, 30, 0.09);
+  --font-head: "Shippori Mincho B1", "Hiragino Mincho ProN", serif;
+  /* なみ縫いステッチ（点線）の共通グラデ */
+  --stitch: repeating-linear-gradient(90deg, var(--gold) 0 9px, transparent 9px 16px);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -35,28 +46,42 @@ button { font-family: inherit; cursor: pointer; }
 input, select, textarea { font-family: inherit; font-size: 14px; }
 
 /* ---------------- ヘッダー ---------------- */
+/* 下辺に「なみ縫い」の金ステッチ。ブランドの一番の顔 */
 .topbar {
   display: flex; align-items: center; gap: 24px;
-  background: #fff; border-bottom: 1px solid var(--line);
+  background: var(--panel); border-bottom: 1px solid var(--line);
   padding: 10px 20px; z-index: 50; flex: 0 0 auto;
+  position: relative;
 }
-.brand { display: flex; flex-direction: column; line-height: 1.2; }
-.brand-name { font-weight: 900; font-size: 18px; color: var(--accent); letter-spacing: 0.02em; }
-.brand-sub { font-size: 11px; color: var(--sub); }
-.steps { display: flex; gap: 4px; list-style: none; margin-left: auto; }
+.topbar::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px;
+  background: var(--stitch);
+  pointer-events: none;
+}
+.brand { display: flex; flex-direction: column; line-height: 1.25; }
+.brand-name {
+  font-family: var(--font-head); font-weight: 700; font-size: 19px;
+  color: var(--accent-dark); letter-spacing: 0.06em;
+}
+.brand-sub { font-size: 10.5px; color: var(--sub); letter-spacing: 0.08em; }
+.steps { display: flex; gap: 6px; list-style: none; margin-left: auto; }
+/* ステップは「織りネームタグ」風の角ばったラベル */
 .steps li {
   display: flex; align-items: center; gap: 7px;
-  padding: 7px 16px; border-radius: 999px; font-size: 13px; font-weight: 700;
-  color: var(--sub); background: transparent;
+  padding: 7px 15px; border-radius: 4px; font-size: 13px; font-weight: 700;
+  color: var(--sub); background: transparent; border: 1px solid transparent;
 }
 .steps li .num {
-  width: 22px; height: 22px; border-radius: 50%;
-  background: #cfd6e0; color: #fff; font-size: 12px;
+  width: 21px; height: 21px; border-radius: 3px;
+  background: #c9c3b2; color: #fff; font-size: 12px;
   display: inline-flex; align-items: center; justify-content: center;
 }
-.steps li.active { background: #fff2e8; color: var(--accent-dark); }
-.steps li.active .num { background: var(--accent); }
-.steps li.done .num { background: #38b26a; }
+.steps li.active {
+  background: var(--accent); color: #fff;
+  outline: 1.5px dashed var(--gold); outline-offset: 2px;
+}
+.steps li.active .num { background: rgba(255, 255, 255, 0.22); }
+.steps li.done .num { background: #3d9b68; }
 .top-actions { display: flex; gap: 8px; }
 
 /* ---------------- 汎用ボタン ---------------- */
@@ -64,12 +89,14 @@ input, select, textarea { font-family: inherit; font-size: 14px; }
   background: var(--accent); color: #fff; border: none;
   padding: 12px 26px; border-radius: var(--radius);
   font-size: 15px; font-weight: 700; box-shadow: var(--shadow);
-  transition: background 0.15s;
+  transition: background 0.15s, outline-color 0.15s;
+  outline: 1.5px dashed transparent; outline-offset: 3px;
 }
-.primary-btn:hover { background: var(--accent-dark); }
-.primary-btn:disabled { background: #c9ced6; cursor: not-allowed; box-shadow: none; }
+/* ホバーで金糸のステッチ枠が「縫い付く」 */
+.primary-btn:hover { background: var(--accent-dark); outline-color: var(--gold); }
+.primary-btn:disabled { background: #c7c2b4; cursor: not-allowed; box-shadow: none; outline: none; }
 .ghost-btn {
-  background: #fff; color: var(--ink); border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line);
   padding: 10px 16px; border-radius: var(--radius); font-size: 13px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 6px;
 }
@@ -85,32 +112,39 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 
 /* ---------------- STEP1 商品選択 ---------------- */
 .step1-inner { max-width: 1080px; margin: 0 auto; padding: 36px 20px 60px; }
-.step1-inner h1 { font-size: 26px; margin-bottom: 10px; }
+/* 大見出しは明朝＋金ステッチの下線 */
+.step1-inner h1 {
+  font-family: var(--font-head); font-size: 27px; letter-spacing: 0.04em;
+  margin-bottom: 10px; padding-bottom: 10px;
+  background: var(--stitch) left bottom / 220px 2px no-repeat;
+}
 .lead { color: var(--sub); margin-bottom: 22px; font-size: 14px; }
 .restore-banner {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  background: #fff8ef; border: 1px solid #ffd9b8; border-radius: var(--radius);
+  background: var(--tint); border: 1px solid #e2d5ae; border-radius: var(--radius);
   padding: 12px 16px; margin-bottom: 20px; font-size: 14px;
 }
 .product-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px;
 }
+/* 商品カードは織りネーム（衣類タグ）風：角小さめ＋ホバーで金ステッチが縫い付く */
 .product-card {
-  background: var(--panel); border: 2px solid transparent; border-radius: 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
   box-shadow: var(--shadow); padding: 14px; text-align: left; transition: 0.15s;
+  outline: 1.5px dashed transparent; outline-offset: 3px;
 }
-.product-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-/* 商品サムネは薄いスタジオ調タイル背景＋接地シャドウ。白い商品でも輪郭・立体感が出る */
-.product-card svg { width: 100%; height: 190px; display: block; border-radius: 10px;
-  background: radial-gradient(125% 100% at 50% 30%, #f6f8fa 0%, #eaedf1 60%, #dfe3e9 100%);
-  filter: drop-shadow(0 9px 11px rgba(28, 40, 60, 0.17)); }
-.product-card .pc-cat { font-size: 11px; color: var(--accent-dark); font-weight: 700; }
+.product-card:hover { border-color: var(--accent); outline-color: var(--gold); transform: translateY(-2px); }
+/* 商品サムネは生成りのスタジオ背景＋接地シャドウ。白い商品でも輪郭・立体感が出る */
+.product-card svg { width: 100%; height: 190px; display: block; border-radius: 7px;
+  background: radial-gradient(125% 100% at 50% 30%, #faf8f1 0%, #eeeadf 60%, #e3ded0 100%);
+  filter: drop-shadow(0 9px 11px rgba(55, 45, 22, 0.16)); }
+.product-card .pc-cat { font-size: 11px; color: var(--gold-dark); font-weight: 700; letter-spacing: 0.05em; }
 .product-card .pc-name { font-size: 15px; font-weight: 700; margin: 2px 0; }
 .product-card .pc-price { font-size: 13px; color: var(--sub); }
-.product-card .pc-price b { color: var(--ink); font-size: 16px; }
+.product-card .pc-price b { color: var(--accent-dark); font-size: 16px; }
 .product-card .pc-note { font-size: 11px; color: var(--sub); margin-top: 6px; }
 .product-card .pc-badges { margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap; }
-.pc-badge { font-size: 10px; background: #eef1f6; border-radius: 4px; padding: 2px 7px; color: var(--sub); font-weight: 600; }
+.pc-badge { font-size: 10px; background: #efece1; border-radius: 3px; padding: 2px 7px; color: var(--sub); font-weight: 600; }
 
 /* ---------------- STEP2 エディタ ---------------- */
 .editor-layout {
@@ -130,7 +164,7 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   border-left: 3px solid transparent;
 }
 .toolrail button .tr-icon { font-size: 19px; font-style: normal; }
-.toolrail button.active { color: #fff; background: rgba(255, 255, 255, 0.08); border-left-color: var(--accent); }
+.toolrail button.active { color: #fff; background: rgba(255, 255, 255, 0.08); border-left-color: var(--gold); }
 .toolrail button:hover { color: #fff; }
 
 .toolpanel {
@@ -162,7 +196,7 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   background: #f6f8fb; border: 1px solid var(--line); border-radius: 8px;
   aspect-ratio: 1; padding: 8px;
 }
-.stamp-btn:hover { border-color: var(--accent); background: #fff4ec; }
+.stamp-btn:hover { border-color: var(--accent); background: var(--tint); }
 .stamp-btn svg { width: 100%; height: 100%; }
 
 .upload-zone {
@@ -170,7 +204,7 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   padding: 26px 12px; text-align: center; color: var(--sub); font-size: 12.5px;
   background: #fafbfd; cursor: pointer;
 }
-.upload-zone.dragover { border-color: var(--accent); background: #fff4ec; }
+.upload-zone.dragover { border-color: var(--accent); background: var(--tint); }
 .upload-note { font-size: 11px; color: var(--sub); margin-top: 10px; line-height: 1.7; }
 /* 背景透過（選択中の画像）操作列 */
 .bg-remove-row { display: flex; flex-direction: column; gap: 8px; }
@@ -207,7 +241,7 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   display: block; border: 2px solid var(--line); border-radius: var(--radius);
   padding: 10px 12px; margin-bottom: 8px; cursor: pointer; background: #fff;
 }
-.method-option.selected { border-color: var(--accent); background: #fff8f2; }
+.method-option.selected { border-color: var(--accent); background: var(--tint-blue); }
 .method-option .mo-name { font-weight: 700; font-size: 13.5px; }
 .method-option .mo-desc { font-size: 11px; color: var(--sub); margin-top: 3px; line-height: 1.5; }
 .method-option input { margin-right: 6px; accent-color: var(--accent); }
@@ -226,11 +260,11 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .canvas-toolbar button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .canvas-wrap {
   flex: 1; display: flex; align-items: center; justify-content: center;
-  overflow: hidden; background: radial-gradient(130% 100% at 50% 28%, #fbfcfd 0%, #eef1f5 58%, #e3e7ed 100%);
+  overflow: hidden; background: radial-gradient(130% 100% at 50% 28%, #fbfaf4 0%, #efece2 58%, #e4dfd1 100%);
   position: relative;
 }
 /* 商品モックアップに接地シャドウ（白い商品も立体的に見せる） */
-#stage .mockup { filter: drop-shadow(0 12px 16px rgba(28, 40, 60, 0.16)); }
+#stage .mockup { filter: drop-shadow(0 12px 16px rgba(55, 45, 22, 0.15)); }
 #stage { width: 100%; height: 100%; touch-action: none; user-select: none; }
 #stage .obj.editable { cursor: move; }
 
@@ -244,12 +278,12 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   border: 2px solid var(--line); background: #fff; border-radius: 8px;
   width: 76px; padding: 5px 4px 3px; flex: 0 0 auto; position: relative;
 }
-.pos-thumb.selected { border-color: var(--accent); background: #fff8f2; }
+.pos-thumb.selected { border-color: var(--accent); background: var(--tint-blue); }
 .pos-thumb svg { width: 100%; height: 44px; display: block; }
 .pos-thumb .pt-name { font-size: 10px; font-weight: 700; color: var(--sub); display: block; margin-top: 2px; }
 .pos-thumb.selected .pt-name { color: var(--accent-dark); }
 .pos-thumb .pt-count {
-  position: absolute; top: -7px; right: -7px; background: var(--accent); color: #fff;
+  position: absolute; top: -7px; right: -7px; background: var(--gold-dark); color: #fff;
   border-radius: 50%; width: 19px; height: 19px; font-size: 11px; font-weight: 700;
   display: flex; align-items: center; justify-content: center;
 }
@@ -265,7 +299,7 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px;
   font-size: 12px; background: #fff; cursor: pointer;
 }
-.layer-row.selected { border-color: var(--accent); background: #fff8f2; }
+.layer-row.selected { border-color: var(--accent); background: var(--tint-blue); }
 .layer-row .lr-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .layer-row button {
   background: none; border: none; font-size: 13px; color: var(--sub); padding: 2px 4px;
@@ -285,9 +319,12 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   display: grid; grid-template-columns: 1fr 1.2fr; gap: 28px; align-items: start;
 }
 .quote-form, .quote-result {
-  background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); padding: 24px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 24px;
 }
-.quote-form h2, .quote-result h2 { font-size: 18px; margin-bottom: 6px; }
+.quote-form h2, .quote-result h2 {
+  font-family: var(--font-head); font-size: 19px; letter-spacing: 0.03em; margin-bottom: 6px;
+  padding-bottom: 8px; background: var(--stitch) left bottom / 150px 2px no-repeat;
+}
 .hint { font-size: 12px; color: var(--sub); margin-bottom: 16px; }
 .size-inputs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
 .size-cell label { font-size: 12px; font-weight: 700; color: var(--sub); display: block; margin-bottom: 4px; }
@@ -324,7 +361,7 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .quote-table .q-detail { font-size: 11px; color: var(--sub); display: block; }
 .quote-totals { margin-top: 14px; border-top: 2px solid var(--ink); padding-top: 12px; }
 .qt-row { display: flex; justify-content: space-between; font-size: 13.5px; padding: 3px 4px; }
-.qt-row.total { font-size: 20px; font-weight: 900; color: var(--accent-dark); padding-top: 8px; }
+.qt-row.total { font-size: 20px; font-weight: 900; color: var(--gold-dark); padding-top: 8px; }
 .qt-row.per { color: var(--sub); font-size: 12.5px; }
 .quote-empty { color: var(--sub); font-size: 13px; padding: 20px 0; }
 .quote-actions { margin-top: 20px; display: flex; flex-direction: column; gap: 10px; }
@@ -348,7 +385,7 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 }
 .prod-box h3, .order-box h3 { font-size: 14px; margin-bottom: 4px; }
 .prod-box .dl-row { margin-top: 8px; }
-.order-box { border-color: var(--box-line, #ffd9b8); background: #fff8f2; }
+.order-box { border-color: #e2d5ae; background: var(--tint); }
 .agree-row { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; color: var(--ink); margin: 10px 0 12px; cursor: pointer; line-height: 1.6; }
 .agree-row input { margin-top: 3px; width: 17px; height: 17px; accent-color: var(--accent); flex: 0 0 auto; }
 .agree-row a { color: var(--accent-dark); }
@@ -368,13 +405,13 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   max-height: 90vh; overflow-y: auto;
 }
 .oc-badge { font-size: 44px; }
-.oc-card h2 { font-size: 20px; margin: 6px 0 10px; }
+.oc-card h2 { font-family: var(--font-head); font-size: 20px; margin: 6px 0 10px; }
 .oc-card p { font-size: 13.5px; color: var(--ink); line-height: 1.7; margin: 8px 0; }
 .oc-no { font-size: 15px; }
-.oc-no b { color: var(--accent-dark); font-size: 18px; letter-spacing: 0.03em; }
+.oc-no b { color: var(--gold-dark); font-size: 18px; letter-spacing: 0.03em; }
 .oc-fallback { color: var(--sub); font-size: 12px; margin-top: 14px; }
 .oc-text { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 11px; margin: 6px 0; }
-.oc-tel { background: #fff8f2; border-radius: 8px; padding: 8px; font-size: 12.5px; }
+.oc-tel { background: var(--tint); border-radius: 8px; padding: 8px; font-size: 12.5px; }
 .oc-tel b { color: var(--accent-dark); }
 .oc-card .primary-btn { margin-top: 14px; }
 
@@ -394,13 +431,13 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .roster-table { max-height: 220px; overflow-y: auto; }
 .roster-table table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
 .roster-table th, .roster-table td { border: 1px solid var(--line); padding: 5px 9px; text-align: left; }
-.roster-table th { background: rgba(255,106,19,.08); color: var(--accent-dark); position: sticky; top: 0; }
+.roster-table th { background: var(--tint); color: var(--gold-dark); position: sticky; top: 0; }
 .roster-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
 .roster-grid .fp-fig figcaption { font-size: 11px; }
 
 /* 全面プレビュー */
 .fp-card { max-width: 860px; text-align: left; }
-.fp-inner h2 { font-size: 18px; text-align: center; }
+.fp-inner h2 { font-family: var(--font-head); font-size: 19px; text-align: center; }
 .fp-sub { text-align: center; color: var(--sub); font-size: 13px; margin-bottom: 12px; }
 .fp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
 .fp-fig { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: #fff; margin: 0; }
@@ -413,16 +450,27 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .fp-card .primary-btn { display: block; margin: 12px auto 0; }
 
 /* ---------------- 概算バー ---------------- */
+/* 濃藍のブランドバー。上辺に金ステッチ、合計は明るい金糸 */
 .estimate-bar {
   flex: 0 0 auto; z-index: 50;
-  background: #fff; border-top: 2px solid var(--line);
+  background: #223c5e; border-top: none;
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 22px; gap: 16px;
+  position: relative;
 }
-.eb-label { font-size: 11px; color: var(--sub); font-weight: 700; display: block; }
-.eb-total b { font-size: 24px; color: var(--accent-dark); letter-spacing: 0.01em; }
-.eb-per { font-size: 12px; color: var(--sub); margin-left: 10px; }
+.estimate-bar::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  background: var(--stitch);
+}
+.eb-label { font-size: 11px; color: #aebdd2; font-weight: 700; display: block; }
+.eb-total b { font-size: 24px; color: var(--gold-bright); letter-spacing: 0.01em; }
+.eb-per { font-size: 12px; color: #9fb0c6; margin-left: 10px; }
 .eb-nav { display: flex; gap: 10px; }
+.estimate-bar .primary-btn { background: var(--gold); color: #241f10; }
+.estimate-bar .primary-btn:hover { background: var(--gold-bright); outline-color: var(--gold-bright); }
+.estimate-bar .primary-btn:disabled { background: #55677f; color: #93a3b8; }
+.estimate-bar .ghost-btn { background: transparent; color: #e8edf4; border-color: rgba(255, 255, 255, 0.42); }
+.estimate-bar .ghost-btn:hover { border-color: var(--gold-bright); color: var(--gold-bright); }
 
 /* ---------------- 見積書（印刷用） ---------------- */
 .quote-sheet { display: none; }
@@ -456,12 +504,12 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 24px;
 }
 .flow-strip span {
-  background: #fff; border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 5px;
   padding: 7px 14px; font-size: 12px; color: var(--sub); font-weight: 600;
   display: inline-flex; align-items: center; gap: 8px;
 }
 .flow-strip b {
-  background: var(--accent); color: #fff; width: 20px; height: 20px; border-radius: 50%;
+  background: var(--gold-dark); color: #fff; width: 20px; height: 20px; border-radius: 4px;
   display: inline-flex; align-items: center; justify-content: center; font-size: 11px;
 }
 
@@ -470,7 +518,7 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   background: #fff; border: 1.5px solid var(--line); border-radius: 10px;
   padding: 8px 6px; text-align: center; transition: 0.15s;
 }
-.template-card:hover { border-color: var(--accent); background: #fff8f2; transform: translateY(-1px); }
+.template-card:hover { border-color: var(--accent); background: var(--tint); transform: translateY(-1px); }
 .template-card svg { width: 100%; height: 84px; display: block; background: #fafbfd; border-radius: 6px; }
 .template-card .tc-name { display: block; font-size: 11.5px; font-weight: 700; margin-top: 6px; }
 .template-card .tc-tag { display: block; font-size: 10px; color: var(--sub); }
@@ -491,13 +539,13 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   pointer-events: none;
 }
 .toast {
-  background: #2b2f36; color: #fff; font-size: 13px; font-weight: 600;
+  background: #223049; color: #fff; font-size: 13px; font-weight: 600;
   border-radius: 10px; padding: 11px 16px; max-width: 340px;
   box-shadow: 0 6px 22px rgba(20, 30, 50, 0.25);
   opacity: 0; transform: translateY(8px); transition: 0.3s;
 }
 .toast.show { opacity: 1; transform: translateY(0); }
-.toast.warn { background: #8a4d10; }
+.toast.warn { background: #7a5a17; }
 
 /* ---------------- レスポンシブ ---------------- */
 @media (max-width: 1080px) {

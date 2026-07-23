@@ -18,14 +18,14 @@
     background: var(--panel); border-radius: 14px; box-shadow: var(--shadow);
     overflow: hidden; cursor: zoom-in; transition: 0.15s; border: 2px solid transparent;
   }
-  .work-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .work-card:hover { transform: translateY(-3px); border-color: var(--accent); outline: 1.5px dashed var(--gold); outline-offset: 3px; }
   .work-card img { width: 100%; display: block; aspect-ratio: 10/9; object-fit: cover; background: #eef1f5; }
   .work-body { padding: 12px 14px 14px; }
   .work-body h2 { font-size: 14.5px; margin: 0 0 6px; }
   .work-body p { font-size: 12px; color: var(--sub); line-height: 1.7; margin: 0 0 8px; }
   .work-tags { display: flex; gap: 5px; flex-wrap: wrap; }
   .work-tag { font-size: 10.5px; background: #eef1f6; border-radius: 4px; padding: 2px 8px; color: var(--sub); font-weight: 600; }
-  .work-sample { font-size: 10.5px; background: #fff4ec; color: var(--accent-dark); border-radius: 4px; padding: 2px 8px; font-weight: 700; }
+  .work-sample { font-size: 10.5px; background: var(--tint); color: var(--gold-dark); border-radius: 4px; padding: 2px 8px; font-weight: 700; }
   .works-cta {
     margin-top: 40px; text-align: center; background: var(--panel); border-radius: 14px;
     box-shadow: var(--shadow); padding: 30px 20px;
@@ -60,7 +60,7 @@
 </header>
 
 <main class="works-main">
-  <h1 style="font-size:22px;margin-bottom:8px">👕 作品集・制作イメージ</h1>
+  <h1 style="font-family:var(--font-head);font-size:23px;letter-spacing:.04em;margin-bottom:8px;padding-bottom:10px;background:var(--stitch) left bottom / 220px 2px no-repeat">👕 作品集・制作イメージ</h1>
   <p class="works-lead">
     これまでの制作例や、デザインシミュレーターで作れるアイテムのイメージをご紹介します。<br>
     気に入ったイメージがあれば、そのまま<a href="index.html">デザインシミュレーター</a>で似たデザインを作ってお見積もりできます。

@@ -459,9 +459,9 @@
           const active = area && a.id === area.id;
           return `<g pointer-events="none">
             <rect x="${a.x}" y="${a.y}" width="${a.w}" height="${a.h}" fill="none"
-              stroke="${active ? "#ff6a13" : "rgba(120,130,150,0.45)"}" stroke-width="${active ? 2.5 : 1.5}"
+              stroke="${active ? "#b8891f" : "rgba(120,130,150,0.45)"}" stroke-width="${active ? 2.5 : 1.5}"
               stroke-dasharray="8 6"/>
-            ${active ? `<text x="${a.x + 4}" y="${a.y - 8}" font-size="17" fill="#ff6a13" font-family="sans-serif">${esc(a.name)}（${esc(areaSizeLabel(a))}）</text>` : ""}
+            ${active ? `<text x="${a.x + 4}" y="${a.y - 8}" font-size="17" fill="#b8891f" font-family="sans-serif">${esc(a.name)}（${esc(areaSizeLabel(a))}）</text>` : ""}
           </g>`;
         })
         .join("");
@@ -508,8 +508,8 @@
     const area = currentArea();
     let guides = "";
     if (drag && drag.mode === "move" && area) {
-      if (dragGuides.v) guides += `<line x1="${area.x + area.w / 2}" y1="${area.y - 24}" x2="${area.x + area.w / 2}" y2="${area.y + area.h + 24}" stroke="#ff6a13" stroke-width="1.5" stroke-dasharray="5 4"/>`;
-      if (dragGuides.h) guides += `<line x1="${area.x - 24}" y1="${area.y + area.h / 2}" x2="${area.x + area.w + 24}" y2="${area.y + area.h / 2}" stroke="#ff6a13" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+      if (dragGuides.v) guides += `<line x1="${area.x + area.w / 2}" y1="${area.y - 24}" x2="${area.x + area.w / 2}" y2="${area.y + area.h + 24}" stroke="#b8891f" stroke-width="1.5" stroke-dasharray="5 4"/>`;
+      if (dragGuides.h) guides += `<line x1="${area.x - 24}" y1="${area.y + area.h / 2}" x2="${area.x + area.w + 24}" y2="${area.y + area.h / 2}" stroke="#b8891f" stroke-width="1.5" stroke-dasharray="5 4"/>`;
     }
     layer.innerHTML = guides + `<g transform="translate(${obj.x} ${obj.y}) rotate(${obj.rotation}) scale(${obj.scale})">
       <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#2d7ff9" stroke-width="${2 / obj.scale}" stroke-dasharray="${6 / obj.scale} ${4 / obj.scale}"/>
