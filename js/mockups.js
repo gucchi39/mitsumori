@@ -325,7 +325,10 @@
        * 解決されて色が崩れる（例：白ポロがTシャツのbaseLumで色替えされ白飛び）。 */
       if (ph && ph.autoColor) {
         const tid = "ptint-" + String((product.id || "p") + "-" + (view || "front") + "-" + (colorId || "x")).replace(/[^a-z0-9_-]/gi, "");
-        defs = `<defs>${photoTintFilter(tid, colorHex, ph.baseLum)}</defs>`;
+        /* 面ごとに元写真の明度が異なる（前面グレー×背面白など）ため、
+         * baseLumByView があればその面の値を、無ければ商品共通の baseLum を使う。 */
+        const bl = (ph.baseLumByView && ph.baseLumByView[view || "front"] != null) ? ph.baseLumByView[view || "front"] : ph.baseLum;
+        defs = `<defs>${photoTintFilter(tid, colorHex, bl)}</defs>`;
         fattr = ` filter="url(#${tid})"`;
       }
       return `<g class="mockup">${defs}<image href="${e}" xlink:href="${e}" x="0" y="0" width="700" height="760" preserveAspectRatio="xMidYMid meet"${fattr}/></g>`;

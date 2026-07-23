@@ -1001,7 +1001,7 @@
 
   /* 前面・背面など、デザインのある全ビューをビュー名付きで書き出す
    * （最後に見ていた面だけ書き出して反対面が入稿から欠落するのを防ぐ） */
-  const VIEW_LABEL = { front: "前面", back: "背面", sleeveL: "左袖", sleeveR: "右袖" };
+  const VIEW_LABEL = { front: "前面", back: "背面", sleeveL: "左袖", sleeveR: "右袖", capSide: "サイド" };
 
   function downloadSVG() {
     if (!Editor.state.product) return;
