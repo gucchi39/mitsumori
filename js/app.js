@@ -639,14 +639,29 @@
     return rosterActive() ? rosterQuantities() : app.quantities;
   }
 
+  /* 最悪ケース採寸の対象メンバー。
+   * 通常規模（48名以下）は全員を採寸して確実に最大サイズを拾う。
+   * 大規模名簿では、差し込み文字が最長になる案（名前・番号・両者合計の
+   * それぞれ上位）だけを採寸対象にする。位置ではなく「長さ」で選ぶので、
+   * 何名いても最長の名前・番号を取りこぼさない（＝61人目以降に最長がいても
+   * 見積サイズ・超過警告に反映される）。比例フォント幅のブレも上位複数で吸収。 */
+  function rosterMeasureEntries() {
+    const valid = app.roster.entries.filter((e) => e.sizeOk !== false);
+    if (valid.length <= 48) return valid;
+    const K = 12;
+    const nlen = (e) => (e.name || "").length;
+    const mlen = (e) => String(e.number || "").length;
+    const top = (keyFn) => [...valid].sort((a, b) => keyFn(b) - keyFn(a)).slice(0, K);
+    return [...new Set([...top(nlen), ...top(mlen), ...top((e) => nlen(e) + mlen(e))])];
+  }
+
   /* 名簿使用時の最悪ケース採寸：差し込み前テンプレ（{名前}/{番号}）ではなく、
-   * 全メンバーの実際の名前・番号に差し替えた各案を測り、エリアごとに最大サイズを採る。
+   * 実際の名前・番号に差し替えた各案を測り、エリアごとに最大サイズを採る。
    * 長い名前がプリント範囲を超える／上のサイズ区分に入る場合も見積・警告へ反映する。 */
   function rosterMaxPlacements(base) {
     const byArea = {};
     for (const pl of base) byArea[pl.areaId] = { ...pl };
-    const entries = app.roster.entries.filter((e) => e.sizeOk !== false).slice(0, 60); // 上限で保護
-    for (const e of entries) {
+    for (const e of rosterMeasureEntries()) {
       const pls = Editor.getPlacements(memberDesigns(e));
       for (const pl of pls) {
         const b = byArea[pl.areaId];
@@ -1388,15 +1403,22 @@
   async function buildOrderFiles(order) {
     const files = [];
     const areas = Editor.designAreas();
-    for (const aid of areas) {
-      const meta = Editor.areaMeta(aid);
-      const svg = Editor.exportProductionSVG(aid);
-      if (svg) files.push({ name: `${order.orderNo}_${meta.name}.svg`, blob: new Blob([svg], { type: "image/svg+xml" }) });
-      try { files.push({ name: `${order.orderNo}_${meta.name}.png`, blob: await Editor.exportProductionPNG(aid, 150) }); } catch (e) {}
+    /* 名簿モードでは基本版下（{名前}/{番号}のまま）は製作不可のため添付しない。
+     * 手動書き出し（downloadProductionSet）と同じ挙動に合わせ、プレースホルダー
+     * 入りのSVG/PNGが製作用データと誤認されるのを防ぐ。差し替え済みの
+     * メンバー個別SVGのみを入稿データとする。 */
+    const rosterMode = rosterActive() && hasPlaceholders();
+    if (!rosterMode) {
+      for (const aid of areas) {
+        const meta = Editor.areaMeta(aid);
+        const svg = Editor.exportProductionSVG(aid);
+        if (svg) files.push({ name: `${order.orderNo}_${meta.name}.svg`, blob: new Blob([svg], { type: "image/svg+xml" }) });
+        try { files.push({ name: `${order.orderNo}_${meta.name}.png`, blob: await Editor.exportProductionPNG(aid, 150) }); } catch (e) {}
+      }
     }
     /* 名簿（チームユニフォーム）注文：{名前}{番号}を各メンバーに差し替えた
-     * 個別の入稿SVGも添付する（テンプレのままでは製作できないため） */
-    if (rosterActive()) {
+     * 個別の入稿SVGを添付する（テンプレのままでは製作できないため） */
+    if (rosterMode) {
       app.roster.entries.forEach((e, i) => {
         const dsn = memberDesigns(e);
         const tag = `${String(i + 1).padStart(2, "0")}_${e.number || ""}_${(e.name || "").replace(/[\\/:*?"<>|]/g, "")}`;

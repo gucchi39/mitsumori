@@ -908,10 +908,16 @@
     if (!state.product) return [];
     return withVisibleStage(() => {
       if (!designsObj) return getPlacementsInner();
-      /* 別のデザイン集合（名簿の差し込み済み等）で採寸する */
+      /* 別のデザイン集合（名簿の差し込み済み等）で採寸する。
+       * objStageBBox はライブDOMの getBBox() を読むため、差し替え直後に
+       * 現在ビューを必ず再レンダリングしてから採寸する（そうしないと表示中
+       * エリアだけ差し替え前＝{名前}/{番号}のままのDOMを測ってしまい、
+       * 長い名前・番号が見積サイズや超過警告に反映されない）。採寸後は
+       * 実デザインへ戻して再描画し、DOMと state.designs の不整合を残さない。 */
       const saved = state.designs;
       state.designs = designsObj;
-      try { return getPlacementsInner(); } finally { state.designs = saved; }
+      render();
+      try { return getPlacementsInner(); } finally { state.designs = saved; render(); }
     });
   }
 
