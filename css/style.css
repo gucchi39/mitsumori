@@ -100,7 +100,10 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   box-shadow: var(--shadow); padding: 14px; text-align: left; transition: 0.15s;
 }
 .product-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-.product-card svg { width: 100%; height: 170px; display: block; }
+/* 商品サムネは薄いスタジオ調タイル背景＋接地シャドウ。白い商品でも輪郭・立体感が出る */
+.product-card svg { width: 100%; height: 190px; display: block; border-radius: 10px;
+  background: radial-gradient(125% 100% at 50% 30%, #f6f8fa 0%, #eaedf1 60%, #dfe3e9 100%);
+  filter: drop-shadow(0 9px 11px rgba(28, 40, 60, 0.17)); }
 .product-card .pc-cat { font-size: 11px; color: var(--accent-dark); font-weight: 700; }
 .product-card .pc-name { font-size: 15px; font-weight: 700; margin: 2px 0; }
 .product-card .pc-price { font-size: 13px; color: var(--sub); }
@@ -193,9 +196,11 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 .canvas-toolbar button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
 .canvas-wrap {
   flex: 1; display: flex; align-items: center; justify-content: center;
-  overflow: hidden; background: repeating-conic-gradient(#f1f3f7 0% 25%, #fafbfd 0% 50%) 50% / 26px 26px;
+  overflow: hidden; background: radial-gradient(130% 100% at 50% 28%, #fbfcfd 0%, #eef1f5 58%, #e3e7ed 100%);
   position: relative;
 }
+/* 商品モックアップに接地シャドウ（白い商品も立体的に見せる） */
+#stage .mockup { filter: drop-shadow(0 12px 16px rgba(28, 40, 60, 0.16)); }
 #stage { width: 100%; height: 100%; touch-action: none; user-select: none; }
 #stage .obj.editable { cursor: move; }
 

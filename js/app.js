@@ -180,8 +180,10 @@
       const card = document.createElement("button");
       card.className = "product-card";
       const methods = p.methods.map((m) => `<span class="pc-badge">${METHODS[m].short}</span>`).join("");
+      /* 写真モックアップは 700×760 全体に商品が写るため、切り取らず全体表示。
+       * 白い商品もタイル背景（CSS）で視認できるようにする。 */
       card.innerHTML = `
-        <svg viewBox="40 70 620 620">${Mockups.renderProductMockup(p, p.colors[0].hex, p.colors[0].id, "front")}</svg>
+        <svg class="pc-fig" viewBox="0 0 700 760">${Mockups.renderProductMockup(p, p.colors[0].hex, p.colors[0].id, "front")}</svg>
         <span class="pc-cat">${p.category}</span>
         <div class="pc-name">${p.name}</div>
         <div class="pc-price"><b>¥${p.basePrice.toLocaleString()}</b> /枚〜（税抜・無地）</div>
