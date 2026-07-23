@@ -237,11 +237,26 @@ const PRODUCTS = [
     category: "Tシャツ",
     basePrice: 980,
     note: "吸汗速乾ポリエステル。スポーツ・部活に。",
+    /* 定番Tシャツと同じ実写真を流用（形状が同一のため） */
+    photos: {
+      autoColor: true,
+      baseLum: 0.41,
+      front: "assets/products/tshirt_front.png",
+      sleeveL: "assets/products/tshirt_sleeve.png",
+      sleeveR: "assets/products/tshirt_sleeve.png",
+    },
     sizes: ["S", "M", "L", "XL", "XXL"],
     sizeSurcharge: { XXL: 110 },
     colors: pick("white", "black", "navy", "red", "royal", "daisy", "forest", "sax"),
     mockup: "tshirt",
     methods: ["silk", "inkjet", "embroidery"],
+    photoAreas: [
+      { id: "front",   name: "前面",   view: "front", x: 258, y: 250, w: 210, h: 250, mmW: 300, mmH: 360 },
+      { id: "chest",   name: "左胸",   view: "front", x: 398, y: 250, w: 78,  h: 78,  mmW: 100, mmH: 100 },
+      { id: "back",    name: "背面",   view: "back",  x: 225, y: 215, w: 250, h: 320, mmW: 300, mmH: 384 },
+      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 300, y: 250, w: 150, h: 120, mmW: 80, mmH: 64 },
+      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 300, y: 250, w: 150, h: 120, mmW: 80, mmH: 64 },
+    ],
     printAreas: [
       { id: "front",   name: "前面",   view: "front", x: 225, y: 235, w: 250, h: 300, mmW: 300, mmH: 360 },
       { id: "chest",   name: "左胸",   view: "front", x: 385, y: 215, w: 85,  h: 85,  mmW: 100, mmH: 100 },
@@ -256,11 +271,20 @@ const PRODUCTS = [
     category: "ポロシャツ",
     basePrice: 1480,
     note: "ユニフォーム・制服に。左胸刺繍が人気です。",
+    photos: {
+      autoColor: true,
+      baseLum: 0.90,
+      front: "assets/products/polo_front.png",
+    },
     sizes: ["S", "M", "L", "XL", "XXL"],
     sizeSurcharge: { XXL: 130 },
     colors: pick("white", "black", "navy", "red", "royal", "forest", "gray", "sax"),
     mockup: "polo",
     methods: ["silk", "inkjet", "embroidery"],
+    photoAreas: [
+      { id: "chest",   name: "左胸",   view: "front", x: 384, y: 232, w: 84,  h: 84,  mmW: 100, mmH: 100 },
+      { id: "front",   name: "前面",   view: "front", x: 238, y: 296, w: 224, h: 214, mmW: 280, mmH: 255 },
+    ],
     printAreas: [
       { id: "chest",   name: "左胸",   view: "front", x: 388, y: 235, w: 85,  h: 85,  mmW: 100, mmH: 100 },
       { id: "front",   name: "前面",   view: "front", x: 235, y: 320, w: 230, h: 210, mmW: 280, mmH: 255 },
@@ -274,11 +298,19 @@ const PRODUCTS = [
     category: "パーカー",
     basePrice: 2980,
     note: "裏毛スウェット。クラスパーカー・チームパーカーに。",
+    photos: {
+      autoColor: true,
+      baseLum: 0.88,
+      front: "assets/products/hoodie_front.png",
+    },
     sizes: ["S", "M", "L", "XL", "XXL"],
     sizeSurcharge: { XXL: 220 },
     colors: pick("white", "black", "navy", "red", "gray", "burgundy", "forest", "pink"),
     mockup: "hoodie",
     methods: ["silk", "inkjet", "embroidery"],
+    photoAreas: [
+      { id: "front",   name: "前面",   view: "front", x: 250, y: 285, w: 210, h: 170, mmW: 260, mmH: 200 },
+    ],
     printAreas: [
       { id: "front",   name: "前面",   view: "front", x: 240, y: 300, w: 220, h: 170, mmW: 260, mmH: 200 },
       { id: "back",    name: "背面",   view: "back",  x: 225, y: 235, w: 250, h: 300, mmW: 300, mmH: 360 },
@@ -291,11 +323,20 @@ const PRODUCTS = [
     category: "キャップ",
     basePrice: 1280,
     note: "コットンツイル。フロント刺繍でショップキャップに。",
+    photos: {
+      autoColor: true,
+      baseLum: 0.87,
+      front: "assets/products/cap_front.png",
+    },
     sizes: ["FREE"],
     sizeSurcharge: {},
     colors: pick("white", "black", "navy", "red", "daisy", "forest", "natural"),
     mockup: "cap",
     methods: ["embroidery", "silk"],
+    photoAreas: [
+      { id: "capFront", name: "フロント", view: "front", x: 285, y: 250, w: 150, h: 130, mmW: 130, mmH: 84 },
+      { id: "capSide",  name: "サイド",   view: "front", x: 470, y: 300, w: 80,  h: 70,  mmW: 70,  mmH: 46 },
+    ],
     printAreas: [
       { id: "capFront", name: "フロント", view: "front", x: 265, y: 300, w: 170, h: 110, mmW: 130, mmH: 84 },
       { id: "capSide",  name: "サイド",   view: "front", x: 470, y: 330, w: 90,  h: 60,  mmW: 70,  mmH: 46 },
@@ -308,11 +349,19 @@ const PRODUCTS = [
     category: "バッグ",
     basePrice: 780,
     note: "厚手キャンバス。ノベルティ・ショップバッグに。",
+    photos: {
+      autoColor: true,
+      baseLum: 0.86,
+      front: "assets/products/tote_front.png",
+    },
     sizes: ["FREE"],
     sizeSurcharge: {},
     colors: pick("natural", "white", "black", "navy", "red", "forest"),
     mockup: "tote",
     methods: ["silk", "inkjet", "embroidery"],
+    photoAreas: [
+      { id: "front", name: "前面", view: "front", x: 205, y: 330, w: 290, h: 270, mmW: 260, mmH: 240 },
+    ],
     printAreas: [
       { id: "front", name: "前面", view: "front", x: 215, y: 300, w: 270, h: 250, mmW: 260, mmH: 240 },
       { id: "back",  name: "背面", view: "back",  x: 215, y: 300, w: 270, h: 250, mmW: 260, mmH: 240 },
