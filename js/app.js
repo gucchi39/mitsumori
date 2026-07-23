@@ -32,6 +32,7 @@
     stampFill: "#111111",
     orderNo: null,
     roster: { active: false, entries: [] },
+    bgBackup: {},   /* 背景透過の「元に戻す」用（オブジェクトID→元画像dataURL、セッション内のみ） */
   };
 
   /* ================= 初期化 ================= */
@@ -104,6 +105,8 @@
       e.target.value = "";
     });
     $("#btnShare").addEventListener("click", shareDesign);
+    $("#btnMyDesigns").addEventListener("click", () => { renderMyDesigns(); $("#myDesigns").hidden = false; });
+    $("#myDesigns").addEventListener("click", (e) => { if (e.target === $("#myDesigns")) $("#myDesigns").hidden = true; });
     $("#btnNew").addEventListener("click", () => {
       if (hasAnyDesign() && !confirm("現在のデザインを破棄して最初からやり直しますか？")) return;
       localStorage.removeItem(AUTOSAVE_KEY);
@@ -199,10 +202,24 @@
   }
 
   function selectProduct(p) {
-    if (Editor.state.product && Editor.state.product.id !== p.id && hasAnyDesign()) {
-      if (!confirm("商品を変更すると現在のデザインはリセットされます。よろしいですか？")) return;
-    }
-    if (!Editor.state.product || Editor.state.product.id !== p.id) {
+    const switching = Editor.state.product && Editor.state.product.id !== p.id;
+    if (switching && hasAnyDesign()) {
+      /* デザインがある状態での商品変更：引き継ぐ／破棄／中止 の三択 */
+      if (confirm(`いまのデザインを「${p.name}」に引き継ぎますか？\n\n[OK] 引き継ぐ（位置・大きさは新しいプリント範囲に自動調整）\n[キャンセル] 引き継がない`)) {
+        const res = Editor.carryDesignsToProduct(p);
+        app.quantities = {};
+        app.orderNo = null;
+        if (res.dropped && res.moved) toast(`デザインを引き継ぎました（対応する位置がない${res.dropped}個は外れました）`, "warn");
+        else if (res.dropped) toast(`この商品には対応するプリント位置がなく、デザインは引き継げませんでした`, "warn");
+        else toast("デザインを引き継ぎました");
+      } else if (confirm("いまのデザインを破棄して商品を変更しますか？")) {
+        Editor.setProduct(p);
+        app.quantities = {};
+        app.orderNo = null;
+      } else {
+        return; /* 商品変更そのものを中止 */
+      }
+    } else if (!Editor.state.product || switching) {
       Editor.setProduct(p);
       app.quantities = {};
       app.orderNo = null; /* 別商品＝別注文。番号を発番し直す */
@@ -353,6 +370,8 @@
       );
 
     } else if (app.tab === "image") {
+      const sel = Editor.state.selectedId ? Editor.designFor(Editor.state.areaId).objects.find((o) => o.id === Editor.state.selectedId) : null;
+      const selImg = sel && sel.type === "image" ? sel : null;
       panel.innerHTML = `
         <h3>画像アップロード</h3>
         <div class="tp-section">
@@ -367,8 +386,24 @@
             ※ <b>刺繍・シルクスクリーンでは写真を再現できません</b>（フルカラープリントをご利用ください）。
           </p>
           <div id="imageWarn"></div>
-        </div>`;
+        </div>
+        ${selImg ? `
+        <div class="tp-section">
+          <span class="tp-label">選択中の画像</span>
+          <div class="bg-remove-row">
+            <select id="bgTol">
+              <option value="18">弱（色の近いものだけ）</option>
+              <option value="32" selected>標準</option>
+              <option value="48">強（影・ムラごと消す）</option>
+            </select>
+            <button class="primary-btn" id="btnBgRemove">✨ 背景を消す</button>
+            <button id="btnBgRestore" ${app.bgBackup[selImg.id] ? "" : "disabled"}>↩ 元に戻す</button>
+          </div>
+          <p class="upload-note">白背景のロゴ等から、外側とつながった背景色を自動で透明にします。<br>
+          ※ 文字の内側など「囲まれた部分」は残ります（デザインの白を守るため）。</p>
+        </div>` : ""}`;
       bindImagePanel();
+      if (selImg) bindBgRemove(selImg);
 
     } else if (app.tab === "method") {
       const d = Editor.designFor(Editor.state.areaId);
@@ -464,6 +499,111 @@
     input.addEventListener("change", () => {
       if (input.files[0]) handleImageFile(input.files[0]);
       input.value = "";
+    });
+  }
+
+  /* ---- 画像の自動背景透過（ロゴ向け） ----
+   * 外周から背景色（外周ピクセルの平均）に近い画素をフラッドフィルで透明化する。
+   * 「外側とつながった背景」だけを消すので、白抜き文字などデザイン内の白は残る。
+   * 商品写真の切り抜きで使った手法の簡易版（ロゴは背景が単色なので色距離で十分）。 */
+  function stripImageBackground(dataUrl, tol) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          /* 大きすぎる画像は処理・データ量とも重いため長辺1600pxへ縮小 */
+          const MAX = 1600;
+          const f = Math.min(1, MAX / Math.max(img.naturalWidth, img.naturalHeight));
+          const W = Math.max(1, Math.round(img.naturalWidth * f));
+          const H = Math.max(1, Math.round(img.naturalHeight * f));
+          const cv = document.createElement("canvas");
+          cv.width = W; cv.height = H;
+          const g = cv.getContext("2d", { willReadFrequently: true });
+          g.drawImage(img, 0, 0, W, H);
+          const im = g.getImageData(0, 0, W, H);
+          const d = im.data, N = W * H;
+
+          /* 背景の代表色＝外周の不透明画素の平均 */
+          let br = 0, bg = 0, bb = 0, bn = 0;
+          const acc = (x, y) => { const i = (y * W + x) * 4; if (d[i + 3] < 40) return; br += d[i]; bg += d[i + 1]; bb += d[i + 2]; bn++; };
+          for (let x = 0; x < W; x++) { acc(x, 0); acc(x, H - 1); }
+          for (let y = 0; y < H; y++) { acc(0, y); acc(W - 1, y); }
+          if (!bn) { resolve(null); return; }   /* 外周がすでに全部透明 */
+          br /= bn; bg /= bn; bb /= bn;
+
+          const dist = (i) => { const dr = d[i] - br, dg = d[i + 1] - bg, db = d[i + 2] - bb; return Math.sqrt(dr * dr + dg * dg + db * db); };
+          const removed = new Uint8Array(N);
+          const stack = [];
+          const seed = (x, y) => {
+            const p = y * W + x; if (removed[p]) return;
+            const i = p * 4;
+            if (d[i + 3] < 40 || dist(i) < tol) { removed[p] = 1; stack.push(p); }
+          };
+          for (let x = 0; x < W; x++) { seed(x, 0); seed(x, H - 1); }
+          for (let y = 0; y < H; y++) { seed(0, y); seed(W - 1, y); }
+          while (stack.length) {
+            const p = stack.pop(); const x = p % W, y = (p / W) | 0;
+            const tryN = (nx, ny) => {
+              if (nx < 0 || ny < 0 || nx >= W || ny >= H) return;
+              const q = ny * W + nx; if (removed[q]) return;
+              const i = q * 4;
+              if (d[i + 3] < 40 || dist(i) < tol) { removed[q] = 1; stack.push(q); }
+            };
+            tryN(x + 1, y); tryN(x - 1, y); tryN(x, y + 1); tryN(x, y - 1);
+          }
+
+          let cnt = 0;
+          for (let p = 0; p < N; p++) if (removed[p]) { d[p * 4 + 3] = 0; cnt++; }
+          if (!cnt) { resolve(null); return; }
+
+          /* 境界1pxを背景色との距離でなだらかに（ギザギザ・フチ残り軽減） */
+          const a0 = new Uint8ClampedArray(N);
+          for (let p = 0; p < N; p++) a0[p] = d[p * 4 + 3];
+          for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+            const p = y * W + x; if (a0[p] === 0) continue;
+            let edge = false;
+            for (let dy = -1; dy <= 1 && !edge; dy++) for (let dx = -1; dx <= 1; dx++) {
+              const nx = x + dx, ny = y + dy;
+              if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+              if (a0[ny * W + nx] === 0) { edge = true; break; }
+            }
+            if (!edge) continue;
+            const i = p * 4;
+            const t = Math.max(0, Math.min(1, (dist(i) - tol * 0.6) / (tol * 0.8)));
+            d[i + 3] = Math.min(d[i + 3], Math.round(40 + t * 215));
+          }
+
+          g.putImageData(im, 0, 0);
+          resolve({ dataUrl: cv.toDataURL("image/png"), removedPct: Math.round((cnt / N) * 100), w: W, h: H });
+        } catch (e) { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    });
+  }
+
+  function bindBgRemove(selImg) {
+    const btn = $("#btnBgRemove");
+    const restore = $("#btnBgRestore");
+    if (btn) btn.addEventListener("click", async () => {
+      btn.disabled = true; btn.textContent = "処理中…";
+      const tol = Number($("#bgTol").value) || 32;
+      const res = await stripImageBackground(selImg.href, tol);
+      btn.disabled = false; btn.textContent = "✨ 背景を消す";
+      if (!res || res.removedPct === 0) { toast("背景らしい部分が見つかりませんでした（すでに透過済みの画像かもしれません）", "warn"); return; }
+      if (res.removedPct > 92) { toast("画像のほぼ全体が背景と判定されたため中止しました。「弱」でお試しください", "warn"); return; }
+      if (!app.bgBackup[selImg.id]) app.bgBackup[selImg.id] = selImg.href;
+      Editor.updateSelected({ href: res.dataUrl });
+      renderToolPanel();
+      toast(`背景を透過しました（画像の約${res.removedPct}%）。戻すときは「元に戻す」へ`);
+    });
+    if (restore) restore.addEventListener("click", () => {
+      const orig = app.bgBackup[selImg.id];
+      if (!orig) return;
+      Editor.updateSelected({ href: orig });
+      delete app.bgBackup[selImg.id];
+      renderToolPanel();
+      toast("元の画像に戻しました");
     });
   }
 
@@ -606,6 +746,7 @@
     if (obj) {
       if (obj.type === "text" && app.tab !== "text") setTab("text");
       else if (obj.type === "stamp" && app.tab !== "stamp") setTab("stamp");
+      else if (obj.type === "image" && app.tab !== "image") setTab("image");
       else renderToolPanel();
     } else {
       renderToolPanel();
@@ -1083,6 +1224,115 @@
     if (cb) cb.checked = app.roster.active;
     if (box && (app.roster.active || entries.length)) box.open = true;
     if (ta) renderRosterUI();
+  }
+
+  /* ================= マイデザイン（ブラウザ内保存・リピート注文向け） ================= */
+
+  const MYDESIGNS_KEY = "mitsumori.mydesigns.v1";
+  const MYDESIGNS_MAX = 12;
+
+  function myDesignsList() {
+    try { const v = JSON.parse(localStorage.getItem(MYDESIGNS_KEY)); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
+  }
+  function myDesignsStore(list) {
+    try { localStorage.setItem(MYDESIGNS_KEY, JSON.stringify(list)); return true; }
+    catch (e) { return false; }
+  }
+
+  async function saveCurrentToMyDesigns() {
+    const p = Editor.state.product;
+    if (!p) { toast("先に商品を選んでデザインを作成してください", "warn"); return; }
+    if (!hasAnyDesign()) { toast("デザインがまだ空です。文字やスタンプを配置してから保存してください", "warn"); return; }
+    const nameEl = $("#mdName");
+    const name = ((nameEl && nameEl.value) || "").trim() || `${p.name}（${new Date().toLocaleDateString("ja-JP")}）`;
+    /* サムネは低解像度PNG（商品写真込み・ローカル保存なので軽さ優先） */
+    let thumb = "";
+    try {
+      const blob = await Editor.exportPNG(0.22, Editor.designViews()[0] || undefined);
+      thumb = await new Promise((ok) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => ok(""); r.readAsDataURL(blob); });
+    } catch (e) { /* サムネ失敗は保存自体を妨げない */ }
+    const entry = {
+      id: "md" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      name: name.slice(0, 40),
+      savedAt: new Date().toISOString(),
+      productName: p.name,
+      thumb,
+      editor: Editor.serialize(),
+      quantities: app.quantities,
+      roster: app.roster && (app.roster.active || (app.roster.entries || []).length) ? app.roster : null,
+    };
+    const list = myDesignsList();
+    list.unshift(entry);
+    while (list.length > MYDESIGNS_MAX) list.pop();
+    if (!myDesignsStore(list)) {
+      entry.thumb = ""; /* 容量不足→サムネなしで再挑戦 */
+      if (!myDesignsStore(list)) {
+        toast("ブラウザの保存容量が足りません。マイデザインの古いものを削除するか、画像の少ないデザインでお試しください", "warn");
+        return;
+      }
+    }
+    if (nameEl) nameEl.value = "";
+    renderMyDesigns();
+    toast(`「${entry.name}」をマイデザインに保存しました`);
+  }
+
+  function loadMyDesign(id) {
+    const e = myDesignsList().find((x) => x.id === id);
+    if (!e) return;
+    if (hasAnyDesign() && !confirm(`「${e.name}」を読み込みますか？\nいまのデザインは置き換えられます。`)) return;
+    if (!Editor.load(e.editor)) { toast("読み込みに失敗しました（データが壊れている可能性があります）", "warn"); return; }
+    app.orderNo = null; /* 読み込んだデザインは別注文として発番し直す */
+    app.quantities = cleanQuantities(e.quantities);
+    restoreRoster(e.roster);
+    $("#myDesigns").hidden = true;
+    goStep(2);
+    renderEditorPanels();
+    refreshQuote();
+    autosave();
+    toast(`「${e.name}」を読み込みました`);
+  }
+
+  function deleteMyDesign(id) {
+    const list = myDesignsList();
+    const e = list.find((x) => x.id === id);
+    if (!e) return;
+    if (!confirm(`「${e.name}」を削除しますか？（元に戻せません）`)) return;
+    myDesignsStore(list.filter((x) => x.id !== id));
+    renderMyDesigns();
+  }
+
+  function renderMyDesigns() {
+    const inner = document.querySelector("#myDesigns .md-inner");
+    if (!inner) return;
+    const list = myDesignsList();
+    const fmt = (iso) => { try { const d = new Date(iso); return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; } catch (e) { return ""; } };
+    const cards = list.map((e) => `
+      <figure class="md-card">
+        ${e.thumb ? `<img src="${escapeHtml(e.thumb)}" alt="">` : `<div class="md-noimg">🎨</div>`}
+        <figcaption>
+          <b>${escapeHtml(e.name)}</b>
+          <span>${escapeHtml(e.productName || "")}・${fmt(e.savedAt)}${e.roster ? "・名簿あり" : ""}</span>
+        </figcaption>
+        <div class="md-actions">
+          <button class="primary-btn" data-mdload="${e.id}">読込</button>
+          <button data-mddel="${e.id}">削除</button>
+        </div>
+      </figure>`).join("");
+    inner.innerHTML = `
+      <h2>📁 マイデザイン</h2>
+      <p class="md-note">このブラウザの中に保存されます（最大${MYDESIGNS_MAX}件）。リピート注文や作り直しにご利用ください。<br>
+      ※ 端末やブラウザを変えると引き継がれません。確実に残したい場合は「💾 保存」でファイル保存も併用を。</p>
+      <div class="md-savebar">
+        <input id="mdName" placeholder="名前を付けて保存（例：野球部ユニフォーム2026）" maxlength="40">
+        <button class="primary-btn" id="mdSaveBtn">いまのデザインを保存</button>
+      </div>
+      ${list.length ? `<div class="md-grid">${cards}</div>` : `<p class="md-empty">まだ保存されたデザインはありません。<br>デザインを作って「いまのデザインを保存」を押すと、ここに並びます。</p>`}
+      <button class="primary-btn md-close" id="mdClose">閉じる</button>`;
+    $("#mdSaveBtn").addEventListener("click", saveCurrentToMyDesigns);
+    $("#mdClose").addEventListener("click", () => { $("#myDesigns").hidden = true; });
+    inner.querySelectorAll("[data-mdload]").forEach((b) => b.addEventListener("click", () => loadMyDesign(b.dataset.mdload)));
+    inner.querySelectorAll("[data-mddel]").forEach((b) => b.addEventListener("click", () => deleteMyDesign(b.dataset.mddel)));
   }
 
   /* {名前}{番号}{NAME}{NUMBER} を置換 */

@@ -7,7 +7,7 @@
 <meta name="description" content="Tシャツ・ポロシャツ・キャップなどにWEB上でデザインして、その場で自動見積もり。刺繍・シルクスクリーン・フルカラープリント対応。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Shippori+Mincho+B1:wght@600&family=Zen+Maru+Gothic:wght@700&family=Mochiy+Pop+One&family=Yuji+Syuku&family=Yomogi&family=Dela+Gothic+One&family=Anton&family=Playfair+Display:wght@600&family=Pacifico&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Shippori+Mincho+B1:wght@600&family=Zen+Maru+Gothic:wght@700&family=Mochiy+Pop+One&family=Yuji+Syuku&family=Yomogi&family=Dela+Gothic+One&family=Anton&family=Playfair+Display:wght@600&family=Pacifico&family=Zen+Kaku+Gothic+New:wght@700&family=Zen+Old+Mincho:wght@700&family=Kaisei+Tokumin:wght@700&family=M+PLUS+Rounded+1c:wght@800&family=Kiwi+Maru:wght@500&family=Potta+One&family=Hachi+Maru+Pop&family=Cherry+Bomb+One&family=RocknRoll+One&family=Reggae+One&family=Rampart+One&family=Train+One&family=Monomaniac+One&family=DotGothic16&family=Stick&family=Yuji+Mai&family=Yusei+Magic&family=Klee+One:wght@600&family=New+Tegomin&family=Kaisei+Decol:wght@700&family=Shippori+Antique+B1&family=Bebas+Neue&family=Oswald:wght@600&family=Montserrat:wght@800&family=Archivo+Black&family=Alfa+Slab+One&family=Russo+One&family=Black+Ops+One&family=Righteous&family=Bangers&family=Luckiest+Guy&family=Dancing+Script:wght@700&family=Caveat:wght@700&family=Permanent+Marker&family=Press+Start+2P&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧵</text></svg>">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -24,9 +24,11 @@
     <li data-step="3"><span class="num">3</span>お見積もり</li>
   </ol>
   <div class="top-actions">
+    <a class="ghost-btn" href="works.html" title="制作事例・作品集を見る">👕 作品集</a>
     <a class="ghost-btn" href="docs/manual.html" target="_blank" rel="noopener" title="使い方マニュアルを開く">❓ 使い方</a>
     <button class="ghost-btn" id="btnNew" title="最初からやり直す">✚ 新規</button>
     <button class="ghost-btn" id="btnShare" title="デザインをURLで共有">🔗 共有</button>
+    <button class="ghost-btn" id="btnMyDesigns" title="このブラウザに保存したデザイン一覧（リピート注文に）">📁 マイデザイン</button>
     <button class="ghost-btn" id="btnSave" title="デザインをファイルに保存">💾 保存</button>
     <label class="ghost-btn" title="保存したデザインを読み込み">📂 読込<input type="file" id="fileLoad" accept=".json" hidden></label>
   </div>
@@ -237,6 +239,11 @@
 <!-- ============ 名簿プレビュー ============ -->
 <div id="rosterPreview" class="order-complete" hidden>
   <div class="oc-card fp-card"><div class="rp-inner"></div></div>
+</div>
+
+<!-- ============ マイデザイン ============ -->
+<div id="myDesigns" class="order-complete" hidden>
+  <div class="oc-card fp-card"><div class="md-inner"></div></div>
 </div>
 
 <div id="toastBox" class="toast-box" aria-live="polite"></div>

@@ -266,11 +266,11 @@
       <div class="tbl-scroll">
       <table>
         <tr><th>メニュー</th><th>できること</th></tr>
-        <tr><td><strong>👕 カラー</strong></td><td>商品本体の色を変える／商品を変更する</td></tr>
+        <tr><td><strong>👕 カラー</strong></td><td>商品本体の色を変える／商品を変更する（<strong>商品変更時は今のデザインを引き継げます</strong>。位置・大きさは新しいプリント範囲へ自動調整）</td></tr>
         <tr><td><strong>📐 テンプレ</strong></td><td>定番デザイン（チームロゴ・クラスT・名入れ 等）をワンクリックで配置。文字は後から書き換え可</td></tr>
-        <tr><td><strong>Ｔ テキスト</strong></td><td>文字を追加。書体・色・フチ取り・文字間隔・<strong>アーチ変形</strong>・<strong>縦書き</strong>（名入れ向け）</td></tr>
+        <tr><td><strong>Ｔ テキスト</strong></td><td>文字を追加。<strong>書体は45種類</strong>（極太・袋文字・毛筆・ポップ・欧文筆記体など）。色・フチ取り・文字間隔・<strong>アーチ変形</strong>・<strong>縦書き</strong>（名入れ向け）</td></tr>
         <tr><td><strong>★ スタンプ</strong></td><td>内蔵イラストを配置。色は自由に変更可</td></tr>
-        <tr><td><strong>⬆ 画像</strong></td><td>画像（JPG/PNG/GIF/WebP）をアップロード。解像度が低いと警告が出ます</td></tr>
+        <tr><td><strong>⬆ 画像</strong></td><td>画像（JPG/PNG/GIF/WebP）をアップロード。<strong>「✨ 背景を消す」でロゴの白背景をワンタップ透過</strong>（強さ3段階・元に戻す付き）。解像度が低いと警告が出ます</td></tr>
         <tr><td><strong>🧵 加工方法</strong></td><td>プリント位置ごとに「刺繍／シルクスクリーン／フルカラー」を選択</td></tr>
       </table>
       </div>
@@ -351,12 +351,16 @@
       <table>
         <tr><th>ボタン</th><th>内容</th></tr>
         <tr><td><strong>🔗 共有</strong></td><td>今のデザインをURL化してコピー。相手に送ると同じデザイン・見積もりが再現されます（サーバー不要。※画像・個人情報は含まれません）</td></tr>
+        <tr><td><strong>📁 マイデザイン</strong></td><td><strong>このブラウザに名前を付けて保存</strong>（最大12件・サムネイル付き）。リピート注文・作り直しに。名簿もいっしょに保存されます</td></tr>
         <tr><td><strong>💾 保存 / 📂 読込</strong></td><td>デザインをファイル（.json）に保存・読み込み</td></tr>
         <tr><td><strong>✚ 新規</strong></td><td>最初からやり直す</td></tr>
       </table>
       </div>
       <div class="callout">
         <span class="ico">🔄</span>作成中のデザインは<strong>自動保存</strong>され、次に開いたとき「続きから再開」できます。
+      </div>
+      <div class="callout">
+        <span class="ico">📁</span><strong>リピート注文のおすすめ</strong>：注文したデザインは「マイデザイン」に保存しておくと、次回は読み込んで枚数を入れるだけ。端末・ブラウザを変えると引き継がれないため、大事なデザインは「💾 保存」のファイルも併用してください。
       </div>
 
       <h3>🛒 ご注文の流れ</h3>
@@ -482,6 +486,21 @@ photoAreas: [   // printAreas をコピーし x/y/w/h を写真に合わせる�
   { id:"front", name:"前面", view:"front", x:250, y:250, w:200, h:260, mmW:300, mmH:360 },
 ],</code></pre>
       <p class="lead">※ 斜め・遠近のある写真に完全に沿わせる（変形合成）は今後対応予定。現状は正面平置き・トルソー正面が最もきれいに合います。詳細は <code>assets/products/README.md</code>。</p>
+
+      <h3>👕 作品集ページの更新（works.html）</h3>
+      <p>制作事例のギャラリー（トップの「👕 作品集」）。<b>お客様の作品を載せるほど信頼と注文につながります</b>。追加は2ステップ：</p>
+      <ol class="steps-ol">
+        <li>作品写真を <code>assets/works/</code> にアップロード（GitHubで「Add file &gt; Upload files」→ 最後に <b>Commit changes</b>）。</li>
+        <li><code>js/works-data.js</code> の <code>WORKS = [</code> のすぐ下に1ブロック追記：</li>
+      </ol>
+      <pre><code>{
+  img:   "assets/works/写真ファイル名.jpg",
+  title: "野球チーム○○様 ユニフォームTシャツ",
+  note:  "背番号・ネーム入りをシルクスクリーンで30枚。",
+  tags:  ["Tシャツ", "チームウェア"],
+  sample: false,   // 実際の作品は false（サンプルは true）
+},</code></pre>
+      <p class="lead">※ 掲載前に必ずお客様の許可を。いまの4件は「制作イメージ」のサンプルです（実作品が増えたら削除OK）。</p>
 
       <h3>🚀 公開・更新</h3>
       <ul class="clean">

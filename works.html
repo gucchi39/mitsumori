@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作品集｜ミツモリ刺繍プリント</title>
+<meta name="description" content="ミツモリ刺繍プリントの制作事例・作品集。Tシャツ・ポロシャツ・パーカー・キャップ・トートバッグなどのオリジナルウェア制作例をご覧いただけます。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  /* 作品集ページ専用の追加スタイル（共通の css/style.css を継承） */
+  .works-main { max-width: 1080px; margin: 0 auto; padding: 26px 18px 60px; }
+  .works-lead { color: var(--sub); font-size: 14px; line-height: 1.9; margin-bottom: 26px; }
+  .works-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
+  .work-card {
+    background: var(--panel); border-radius: 14px; box-shadow: var(--shadow);
+    overflow: hidden; cursor: zoom-in; transition: 0.15s; border: 2px solid transparent;
+  }
+  .work-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+  .work-card img { width: 100%; display: block; aspect-ratio: 10/9; object-fit: cover; background: #eef1f5; }
+  .work-body { padding: 12px 14px 14px; }
+  .work-body h2 { font-size: 14.5px; margin: 0 0 6px; }
+  .work-body p { font-size: 12px; color: var(--sub); line-height: 1.7; margin: 0 0 8px; }
+  .work-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+  .work-tag { font-size: 10.5px; background: #eef1f6; border-radius: 4px; padding: 2px 8px; color: var(--sub); font-weight: 600; }
+  .work-sample { font-size: 10.5px; background: #fff4ec; color: var(--accent-dark); border-radius: 4px; padding: 2px 8px; font-weight: 700; }
+  .works-cta {
+    margin-top: 40px; text-align: center; background: var(--panel); border-radius: 14px;
+    box-shadow: var(--shadow); padding: 30px 20px;
+  }
+  .works-cta p { color: var(--sub); font-size: 13.5px; margin-bottom: 14px; }
+  .works-cta .primary-btn { display: inline-block; text-decoration: none; padding: 13px 34px; }
+  /* ライトボックス */
+  .lightbox {
+    position: fixed; inset: 0; background: rgba(20, 24, 32, 0.82); z-index: 90;
+    display: flex; align-items: center; justify-content: center; padding: 24px; cursor: zoom-out;
+  }
+  .lightbox[hidden] { display: none; }
+  .lightbox figure { max-width: min(860px, 94vw); margin: 0; text-align: center; }
+  .lightbox img { max-width: 100%; max-height: 76vh; border-radius: 12px; background: #fff; }
+  .lightbox figcaption { color: #fff; font-size: 13.5px; margin-top: 12px; line-height: 1.7; }
+  .works-empty { text-align: center; color: var(--sub); padding: 60px 0; font-size: 14px; line-height: 2; }
+</style>
+</head>
+<body>
+
+<header id="header">
+  <div class="brand">
+    <a href="index.html" style="text-decoration:none;color:inherit">
+      <h1>ミツモリ刺繍プリント</h1>
+      <p class="brand-sub">オリジナルウェア デザインシミュレーター</p>
+    </a>
+  </div>
+  <div class="top-actions">
+    <a class="ghost-btn" href="index.html">🎨 デザインを作る</a>
+    <a class="ghost-btn" href="docs/manual.html" target="_blank" rel="noopener">❓ 使い方</a>
+  </div>
+</header>
+
+<main class="works-main">
+  <h1 style="font-size:22px;margin-bottom:8px">👕 作品集・制作イメージ</h1>
+  <p class="works-lead">
+    これまでの制作例や、デザインシミュレーターで作れるアイテムのイメージをご紹介します。<br>
+    気に入ったイメージがあれば、そのまま<a href="index.html">デザインシミュレーター</a>で似たデザインを作ってお見積もりできます。
+  </p>
+  <div class="works-grid" id="worksGrid"></div>
+  <div class="works-empty" id="worksEmpty" hidden>作品を準備中です。もうしばらくお待ちください。</div>
+
+  <div class="works-cta">
+    <p>あなたのチーム・お店・イベントのオリジナルウェアも、ブラウザだけで今すぐデザインできます。</p>
+    <a class="primary-btn" href="index.html">無料でデザインを作ってみる ▶</a>
+  </div>
+</main>
+
+<div class="lightbox" id="lightbox" hidden>
+  <figure>
+    <img id="lbImg" src="" alt="">
+    <figcaption id="lbCap"></figcaption>
+  </figure>
+</div>
+
+<script src="js/works-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const grid = document.getElementById("worksGrid");
+  const works = (typeof WORKS !== "undefined" && Array.isArray(WORKS)) ? WORKS : [];
+  if (!works.length) { document.getElementById("worksEmpty").hidden = false; }
+  grid.innerHTML = works.map((w, i) => `
+    <figure class="work-card" data-i="${i}" style="margin:0">
+      <img src="${esc(w.img)}" alt="${esc(w.title)}" loading="lazy">
+      <div class="work-body">
+        <h2>${esc(w.title)}</h2>
+        <p>${esc(w.note)}</p>
+        <div class="work-tags">
+          ${w.sample ? '<span class="work-sample">制作イメージ</span>' : ""}
+          ${(w.tags || []).map((t) => `<span class="work-tag">${esc(t)}</span>`).join("")}
+        </div>
+      </div>
+    </figure>`).join("");
+
+  const lb = document.getElementById("lightbox");
+  const lbImg = document.getElementById("lbImg");
+  const lbCap = document.getElementById("lbCap");
+  grid.addEventListener("click", (e) => {
+    const card = e.target.closest(".work-card");
+    if (!card) return;
+    const w = works[Number(card.dataset.i)];
+    if (!w) return;
+    lbImg.src = w.img;
+    lbImg.alt = w.title;
+    lbCap.textContent = `${w.title}${w.sample ? "（制作イメージ）" : ""} — ${w.note}`;
+    lb.hidden = false;
+  });
+  lb.addEventListener("click", () => { lb.hidden = true; lbImg.src = ""; });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { lb.hidden = true; lbImg.src = ""; } });
+})();
+</script>
+</body>
+</html>

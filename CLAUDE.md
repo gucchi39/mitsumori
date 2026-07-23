@@ -93,8 +93,25 @@
 
 ## その他
 
+- **競合調査由来の機能（2026-07実装）**：①画像の背景透過（app.js `stripImageBackground`・外周フラッド色距離方式、
+  「元に戻す」は app.bgBackup にセッション内保持）②フォント45種（既存10のIDは不変・保存互換。<link>とconfig FONTSの両方を更新すること）
+  ④マイデザイン（localStorage `mitsumori.mydesigns.v1`・最大12件・サムネはexportPNG(0.22)）
+  ⑤商品切替の引き継ぎ（editor.js `carryDesignsToProduct`・同名エリア＋front⇄capFront/back⇄capBack別名・実寸維持・
+  収まらなければ `fitOversizeObjects` が自動縮小）⑦作品集 works.html（データは js/works-data.js の WORKS 配列。
+  追加手順はマニュアル運営編に記載。sample:true は「制作イメージ」バッジ）。検証は scratchpad `features_test.mjs`(33)。
 - 商品グリッドのサムネは viewBox="0 0 700 760" 全体表示＋スタジオ調背景＋drop-shadow（白商品の視認性）。
 - エディタ背景もスタジオ調グラデ（チェッカー柄は廃止）。`#stage .mockup` に接地シャドウ。
 - マニュアルは `docs/MANUAL.md` / `docs/manual.html`（お客様向け＋運営向け）。機能を足したら更新する。
 - 定期的な自己チェック（send_later等）は**ユーザーが不要と明言済み**。Codex等のイベントはwebhookで届くので、
   届いたときだけ動く。無変化の状況報告は送らない。
+
+## 後日検討リスト（ユーザー承認済みの保留案件。勝手に着手しない）
+
+- **納期表示＋早割**：見積に「今注文でいつ発送」を出し、納期に余裕があると自動割引。
+  ユーザー判断で保留（納期を確約できる生産体制になってから）。competitor: originalprint.jp の早割5%。
+- **ネーム刺繍パック**：書体・糸色を選ぶだけの定型名入れ刺繍メニュー。実運用の値付けは既に同方式だが、
+  シミュレーター上の商品化は保留。
+- **受注生産販売の代行**（BASE連携的なもの）：見送り。
+- **レビュー投稿割引・次回クーポン**：不要と明言済み。
+- **サイトデザインの差別化**は着手決定済みの重量級タスク（タスク#39）。参考サイト
+  design.s-graphi.co.jp の丸パクリ状態を脱し、構成は維持して見た目を独自化する。

@@ -149,6 +149,34 @@
     }
   }
 
+  /* 商品切替の引き継ぎ後、プリント範囲に収まらないオブジェクトを自動で
+   * 縮小・移動して範囲内へ収める（DOM採寸が必要なため描画後に実行）。 */
+  function fitOversizeObjects(areas) {
+    return withVisibleStage(() => {
+      const savedArea = state.areaId;
+      for (const a of areas) {
+        const d = state.designs[a.id];
+        if (!d || !d.objects || !d.objects.length) continue;
+        if (state.areaId !== a.id) { state.areaId = a.id; render(); }
+        for (const o of d.objects) {
+          let bb = objStageBBox(o);
+          if (!bb || !bb.w || !bb.h) continue;
+          const s = Math.min(1, (a.w * 0.94) / bb.w, (a.h * 0.94) / bb.h);
+          if (s < 1) { o.scale = Math.max(0.05, n(o.scale) * s); render(); bb = objStageBBox(o); }
+          if (!bb) continue;
+          let dx = 0, dy = 0;
+          if (bb.x < a.x) dx = a.x - bb.x;
+          else if (bb.x + bb.w > a.x + a.w) dx = (a.x + a.w) - (bb.x + bb.w);
+          if (bb.y < a.y) dy = a.y - bb.y;
+          else if (bb.y + bb.h > a.y + a.h) dy = (a.y + a.h) - (bb.y + bb.h);
+          if (dx || dy) { o.x = n(o.x) + dx; o.y = n(o.y) + dy; render(); }
+        }
+      }
+      if (state.areaId !== savedArea) state.areaId = savedArea;
+      render();
+    });
+  }
+
   function sanitizeDesigns(rawDesigns, product) {
     const clean = {};
     const validAreas = new Set([...(product.printAreas||[]), ...(product.photoAreas||[])].map((a) => a.id));
@@ -1329,6 +1357,59 @@
       remapDesignsForAreaChange(before, productAreas());
       render();
       callbacks.onChange();
+    },
+
+    /** 商品を切り替えつつ、いまのデザインを新商品のプリント範囲へ引き継ぐ。
+     *  同じ位置ID同士（front→front等。cap系はfront⇄capFront/back⇄capBackの別名対応）で
+     *  相対位置を保って写像し、px/mm比で scale を補正して実寸を維持。
+     *  収まらない場合は自動で縮小・範囲内へ移動する。
+     *  戻り値 {moved, dropped}: 引き継げた/対応位置が無く外れたオブジェクト数 */
+    carryDesignsToProduct(product, colorId) {
+      const oldAreas = productAreas().map((a) => ({ id: a.id, x: a.x, y: a.y, w: a.w, h: a.h, mmW: a.mmW, mmH: a.mmH }));
+      const oldDesigns = state.designs;
+      state.product = product;
+      state.colorId = colorId && product.colors.some((c) => c.id === colorId) ? colorId : product.colors[0].id;
+      const newAreas = productAreas(product);
+      const targetIds = new Set(newAreas.map((a) => a.id));
+      const ALIAS = { front: "capFront", capFront: "front", back: "capBack", capBack: "back" };
+      const resolveId = (id) => (targetIds.has(id) ? id : (ALIAS[id] && targetIds.has(ALIAS[id]) ? ALIAS[id] : null));
+      const carried = {};
+      let moved = 0, dropped = 0;
+      for (const [aid, d] of Object.entries(oldDesigns || {})) {
+        if (!d || !d.objects || !d.objects.length) continue;
+        const tid = resolveId(aid);
+        if (!tid || carried[tid]) { dropped += d.objects.length; continue; }
+        const a1 = oldAreas.find((a) => a.id === aid);
+        const a2 = newAreas.find((a) => a.id === tid);
+        const objs = d.objects.map((o) => Object.assign({}, o));
+        if (a1 && a2) {
+          const rw = (a2.w / (a2.mmW || 1)) / (a1.w / (a1.mmW || 1));
+          const rh = (a2.h / (a2.mmH || 1)) / (a1.h / (a1.mmH || 1));
+          const r = (rw + rh) / 2;
+          for (const o of objs) {
+            const fx = (n(o.x) - a1.x) / a1.w, fy = (n(o.y) - a1.y) / a1.h;
+            o.x = a2.x + fx * a2.w;
+            o.y = a2.y + fy * a2.h;
+            o.scale = Math.max(0.05, n(o.scale) * r);
+          }
+        }
+        carried[tid] = {
+          methodId: product.methods.includes(d.methodId) ? d.methodId : product.methods[0],
+          objects: objs,
+        };
+        moved += objs.length;
+      }
+      state.designs = carried;
+      state.selectedId = null;
+      state.areaId = (newAreas.find((a) => carried[a.id]) || newAreas[0]).id;
+      for (const a of newAreas) design(a.id);
+      undoStack = []; redoStack = [];
+      render();
+      fitOversizeObjects(newAreas);
+      lastSnapshot = snapshot();
+      callbacks.onChange();
+      callbacks.onSelect(null);
+      return { moved, dropped };
     },
 
     setArea(areaId) {
