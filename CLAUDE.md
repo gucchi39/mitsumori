@@ -8,6 +8,10 @@
 - 開発・プッシュは **`claude/embroidery-print-service-lakz9a` ブランチのみ**。他ブランチへは明示許可なしにプッシュしない。
 - プッシュ → GitHub Pages が自動デプロイ（`.github/workflows/deploy-pages.yml`）。
   公開URL: **https://gucchi39.github.io/mitsumori/** 。作業後は必ずプッシュし、ユーザーへURLを添えて報告する。
+  Pages の**初回有効化は手動**（Settings > Pages > Source: GitHub Actions）。GITHUB_TOKEN では API 有効化不可
+  （configure-pages の enablement:true は「Resource not accessible by integration」で失敗する。実績あり・撤去済み）。
+  この作業環境から `*.github.io` へのHTTP閲覧は**プロキシが403で遮断**するため、デプロイ確認は
+  Actions API（run結論＋アーティファクトサイズ）で行う。curl で 000/403 でも慌てない。
 - PR #2 がレビュー用に開いている。Codex がレビューする（ユーザーが `@codex review` とコメント→結果はwebhookで届く）。
   指摘は1件ずつコード上で再現・精査してから直す。妥当なら修正＋専用E2Eを足す。GitHubへのコメントは最小限。
 - コミットメッセージ・PR・コードに **モデルIDを書かない**（チャット返信のみ可）。
