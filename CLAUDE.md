@@ -49,18 +49,23 @@
 ## モデル着用イメージ（wornPhotos・2026-07。#btnWorn で表示）
 
 - `PRODUCTS[].wornPhotos[view] = { base, shirt, lum, img, map }`。base=人物切り抜き（肌・髪の色は不変のまま表示）、
-  shirt=シャツ生地だけの同位置レイヤー（photoTintFilter で全12色に着色）。現在 tshirt/drytshirt の
-  front/back/sleeveL/sleeveR が対応（同一モデル写真を流用）。img=ステージ配置、map=デザイン写像先。
+  shirt=シャツ生地だけの同位置レイヤー（photoTintFilter で全12色に着色）。現在 tshirt/drytshirt（同一写真流用）・
+  **polo・hoodie** の front/back/sleeveL/sleeveR が対応。img=ステージ配置、map=デザイン写像先。
   **map の縦横比はビューと同名の実効版面と必ず一致させる**（歪み防止。editor.js がアフィン写像）。
-- 資産生成は scratchpad `process_worn.mjs`：キャプション帯検出除去→std<1.3フラッド→最大成分→
+  **polo/hoodie の sleeveR は sleeveL の鏡像**（左右対称。元sideR写真は切り抜きの背中側が乱れたため不採用。
+  `mirror_polo.mjs`/`mirror_hoodie.mjs` で base/shirt 両方を反転。config の sleeveR.lum は sleeveL と同値にする）。
+- 資産生成は scratchpad `process_worn.mjs`（単体・src_worn_<view>）／`process_worn_prod.mjs`（商品別・
+  `PROD=polo VIEWS=front,back,sleeveL` 等で src_worn_<prod>_<view> を処理）：
+  キャプション帯検出除去→std<1.3フラッド→最大成分→
   **モップアップ**（境界6px帯からシード。stdの高い縁リングを飛び越えて、行別背景色 dist<26 かつ lum>132 の
   残骸を除去。**穴埋めは行わない＝腕と胴の隙間を保持**）→closing(6)/erode(2)→シャツ分類
   （sat<22 && lum>105 && R-B<18 →最大成分→closing(5)→内包穴埋め）。出力は base/shirt 2枚（同一クロップ・高さ1300px）。
-- map の調整は `grid_worn.mjs`（座標グリッド重ね）→ `calib_worn.mjs`（ランタイムでmap候補を当てて4ビュー撮影）。
+- map/img の調整は `grid_worn_prod.mjs`（PROD/IMG env・座標グリッド重ね）→ `calib_worn_prod.mjs`
+  （PROD env・実機にサンプルデザインを載せて4ビュー撮影）。品質確認は `worn_montage_prod.mjs`（マゼンタ地×全色）。
 - **採寸（getPlacements）は着用表示を一時解除して行う**（縮小グループ内の文字は getBBox が1%弱ブレて
   サイズ区分境界で見積が揺れるため。savedWorn で復元）。
 - ボタン表示は updateWornButton：wornPhotos があれば表示。実写商品で wornPhotos が無いものは非表示のまま
-  （旧トルソー演出はイラスト商品専用）。検証は scratchpad `worn_test.mjs`(11)。
+  （旧トルソー演出はイラスト商品専用）。検証は scratchpad `worn_test.mjs`(21)。
 - 他商品へ展開する手順：同条件のモデル着用写真（無地グレーor白・単色薄背景・1人・文字/方眼なし・
   1ビュー1枚）をもらう→ process_worn.mjs の VIEWS/パスを合わせて実行→ config に wornPhotos を追記→
   grid/calib で img・map 調整→ worn_test 追加。
@@ -96,7 +101,7 @@
   （注文POST捕捉が要る回帰は `codex_server.mjs`・ポート8932）。サーバは Bash の run_in_background で起動する（`&` は死ぬ）。
 - 回帰セット: `codex5_test.mjs`(7・要8932)・`codex6_test.mjs`(5)・`codex7_test.mjs`(5)・`codex8_test.mjs`(11)・
   `codex9_test.mjs`(13)・`codex10_test.mjs`(14)・`codex11_test.mjs`(7)・写真スモーク `smoke2.mjs`(26)・新機能 `features_test.mjs`(33)・
-  側面UI `ui3_fixes_test.mjs`(11)・版面ガード `calib_guard_test.mjs`(33)・着用 `worn_test.mjs`(11)。
+  側面UI `ui3_fixes_test.mjs`(11)・版面ガード `calib_guard_test.mjs`(33)・着用 `worn_test.mjs`(21)。
   コード変更時はユニット含め全部回してからコミットする。
 
 ## 過去に直した罠（再発させない）

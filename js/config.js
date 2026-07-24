@@ -301,6 +301,13 @@ const PRODUCTS = [
       sleeveL: "assets/products/polo_sideL.png",
       sleeveR: "assets/products/polo_sideR.png",
     },
+    /* モデル着用写真（右側面は左側面の鏡像）。map は各ビュー同名の実効版面と縦横比一致 */
+    wornPhotos: {
+      front:   { base: "assets/products/worn_polo_front.png",  shirt: "assets/products/worn_polo_front_shirt.png",  lum: 0.829, img: { x: 120, y: -12, w: 460, h: 780 }, map: { x: 270, y: 290, w: 130, h: 124 } },
+      back:    { base: "assets/products/worn_polo_back.png",   shirt: "assets/products/worn_polo_back_shirt.png",   lum: 0.814, img: { x: 136, y: -12, w: 429, h: 780 }, map: { x: 265, y: 270, w: 130, h: 177 } },
+      sleeveL: { base: "assets/products/worn_polo_sideL.png",  shirt: "assets/products/worn_polo_sideL_shirt.png",  lum: 0.779, img: { x: 232, y: -12, w: 235, h: 780 }, map: { x: 300, y: 330, w: 90,  h: 71 } },
+      sleeveR: { base: "assets/products/worn_polo_sideR.png",  shirt: "assets/products/worn_polo_sideR_shirt.png",  lum: 0.779, img: { x: 233, y: -12, w: 235, h: 780 }, map: { x: 310, y: 330, w: 90,  h: 71 } },
+    },
     sizes: ["S", "M", "L", "XL", "XXL"],
     sizeSurcharge: { XXL: 130 },
     colors: pick("white", "black", "navy", "red", "royal", "forest", "gray", "sax"),
@@ -335,6 +342,13 @@ const PRODUCTS = [
       back: "assets/products/hoodie_back.png",
       sleeveL: "assets/products/hoodie_sideL.png",
       sleeveR: "assets/products/hoodie_sideR.png",
+    },
+    /* モデル着用写真（実写4方向）。map は各ビュー同名の実効版面と縦横比一致 */
+    wornPhotos: {
+      front:   { base: "assets/products/worn_hoodie_front.png",  shirt: "assets/products/worn_hoodie_front_shirt.png",  lum: 0.822, img: { x: 120, y: -12, w: 460, h: 780 }, map: { x: 265, y: 320, w: 150, h: 121 } },
+      back:    { base: "assets/products/worn_hoodie_back.png",   shirt: "assets/products/worn_hoodie_back_shirt.png",   lum: 0.807, img: { x: 136, y: -12, w: 429, h: 780 }, map: { x: 260, y: 275, w: 160, h: 190 } },
+      sleeveL: { base: "assets/products/worn_hoodie_sideL.png",  shirt: "assets/products/worn_hoodie_sideL_shirt.png",  lum: 0.788, img: { x: 232, y: -12, w: 235, h: 780 }, map: { x: 300, y: 330, w: 80,  h: 147 } },
+      sleeveR: { base: "assets/products/worn_hoodie_sideR.png",  shirt: "assets/products/worn_hoodie_sideR_shirt.png",  lum: 0.788, img: { x: 233, y: -12, w: 235, h: 780 }, map: { x: 310, y: 330, w: 80,  h: 147 } },
     },
     sizes: ["S", "M", "L", "XL", "XXL"],
     sizeSurcharge: { XXL: 220 },
