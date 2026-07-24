@@ -234,6 +234,20 @@
     renderPositionBar();
     renderLayerList();
     renderAreaInfo();
+    updateWornButton();
+  }
+
+  /* 着用イメージボタンの表示制御：実写写真の商品では旧イラスト用トルソー演出が
+   * 破綻して見える（実写の袖からイラストの肌色がはみ出す）ため出さない。
+   * モデル着用写真に対応したらここで再び有効化する */
+  function updateWornButton() {
+    const btn = $("#btnWorn");
+    if (!btn) return;
+    const p = Editor.state.product;
+    const photoBacked = !!(p && Mockups.photoFor && Mockups.photoFor(p, Editor.state.colorId, "front"));
+    const show = !!p && Mockups.isWearable(p) && !photoBacked;
+    btn.hidden = !show;
+    if (!show && Editor.state.worn) { Editor.toggleWorn(); btn.classList.remove("on"); }
   }
 
   function setTab(tab) {

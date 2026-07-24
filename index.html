@@ -72,6 +72,10 @@
       <div class="toolpanel" id="toolPanel"></div>
 
       <div class="canvas-col">
+        <div class="position-bar">
+          <span class="pb-label">📍 プリント位置<small>（まずどこに入れるかを選択）</small></span>
+          <div class="pb-thumbs" id="positionBar"></div>
+        </div>
         <div class="canvas-toolbar">
           <div class="ct-group">
             <button id="btnUndo" title="もどる (元に戻す)">↩ もどる</button>
@@ -93,13 +97,10 @@
             <button id="saCenter" title="プリント範囲の中央に配置">◎ 中央</button>
             <button id="saFlip" title="左右反転（スタンプ・画像）">⇋ 反転</button>
           </div>
+          <span class="drag-hint">🖱 デザインの移動は<b>右ボタンでドラッグ</b>（左クリック＝選択）</span>
         </div>
         <div class="canvas-wrap" id="canvasWrap">
           <svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 760"></svg>
-        </div>
-        <div class="position-bar">
-          <span class="pb-label">プリント位置</span>
-          <div class="pb-thumbs" id="positionBar"></div>
         </div>
       </div>
 

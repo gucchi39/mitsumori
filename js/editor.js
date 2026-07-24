@@ -518,12 +518,15 @@
       if (dragGuides.v) guides += `<line x1="${area.x + area.w / 2}" y1="${area.y - 24}" x2="${area.x + area.w / 2}" y2="${area.y + area.h + 24}" stroke="#b8891f" stroke-width="1.5" stroke-dasharray="5 4"/>`;
       if (dragGuides.h) guides += `<line x1="${area.x - 24}" y1="${area.y + area.h / 2}" x2="${area.x + area.w + 24}" y2="${area.y + area.h / 2}" stroke="#b8891f" stroke-width="1.5" stroke-dasharray="5 4"/>`;
     }
-    layer.innerHTML = guides + `<g transform="translate(${obj.x} ${obj.y}) rotate(${obj.rotation}) scale(${obj.scale})">
+    /* 枠・接続線はクリックを透過させ（pointer-events:none）、ハンドルだけ
+     * 受け付ける。透過しないと、選択中のオブジェクトへの右ドラッグ（移動）や
+     * 再クリックが枠線・接続線に横取りされて効かないことがある */
+    layer.innerHTML = guides + `<g pointer-events="none" transform="translate(${obj.x} ${obj.y}) rotate(${obj.rotation}) scale(${obj.scale})">
       <rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="#2d7ff9" stroke-width="${2 / obj.scale}" stroke-dasharray="${6 / obj.scale} ${4 / obj.scale}"/>
       <line x1="0" y1="${y}" x2="0" y2="${y - 26 / obj.scale}" stroke="#2d7ff9" stroke-width="${2 / obj.scale}"/>
-      <circle data-handle="rotate" cx="0" cy="${y - 32 / obj.scale}" r="${handleR}" fill="#fff" stroke="#2d7ff9" stroke-width="${2 / obj.scale}" style="cursor:grab"/>
-      <rect data-handle="scale" x="${x + w - handleR}" y="${y + h - handleR}" width="${handleR * 2}" height="${handleR * 2}" fill="#2d7ff9" stroke="#fff" stroke-width="${1.5 / obj.scale}" style="cursor:nwse-resize"/>
-      <g data-handle="delete" style="cursor:pointer">
+      <circle data-handle="rotate" pointer-events="all" cx="0" cy="${y - 32 / obj.scale}" r="${handleR}" fill="#fff" stroke="#2d7ff9" stroke-width="${2 / obj.scale}" style="cursor:grab"/>
+      <rect data-handle="scale" pointer-events="all" x="${x + w - handleR}" y="${y + h - handleR}" width="${handleR * 2}" height="${handleR * 2}" fill="#2d7ff9" stroke="#fff" stroke-width="${1.5 / obj.scale}" style="cursor:nwse-resize"/>
+      <g data-handle="delete" pointer-events="all" style="cursor:pointer">
         <circle cx="${x + w + 18 / obj.scale}" cy="${y}" r="${handleR}" fill="#e5484d"/>
         <path d="M ${x + w + 18 / obj.scale - 4.5 / obj.scale} ${y - 4.5 / obj.scale} l ${9 / obj.scale} ${9 / obj.scale} M ${x + w + 18 / obj.scale + 4.5 / obj.scale} ${y - 4.5 / obj.scale} l ${-9 / obj.scale} ${9 / obj.scale}" stroke="#fff" stroke-width="${2.2 / obj.scale}" stroke-linecap="round"/>
       </g>
@@ -570,14 +573,19 @@
 
   function onPointerDown(evt) {
     if (!state.product || state.preview) return;
-    /* マウスは左ボタンのみ受け付ける（右・中クリックでのドラッグ移動を防ぐ。
-     * タッチ・ペンは button が 0/-1 のため影響しない） */
-    if (evt.pointerType === "mouse" && evt.button !== 0) return;
+    /* マウスの役割分担（ユーザー指定・2026-07確定）：
+     *  - 左ボタン: 選択・ハンドル操作（拡大/回転/削除）・空白ドラッグでパン。
+     *    オブジェクトの「移動」はしない（うっかりズレの防止）
+     *  - 右ボタン: オブジェクトの移動ドラッグ専用（stage上はメニュー抑止済み）
+     *  - タッチ・ペン: 従来通りドラッグで移動（button は 0/-1） */
+    const isMouse = evt.pointerType === "mouse";
+    if (isMouse && evt.button !== 0 && evt.button !== 2) return; // 中ボタン等は無視
+    const rightBtn = isMouse && evt.button === 2;
     pointers.set(evt.pointerId, { x: evt.clientX, y: evt.clientY });
     if (startPinchIfTwo()) { capture(evt); evt.preventDefault(); return; }
 
     const pt = svgPoint(evt);
-    const handleEl = evt.target.closest("[data-handle]");
+    const handleEl = !rightBtn ? evt.target.closest("[data-handle]") : null;
     const obj = selectedObj();
 
     if (handleEl && obj) {
@@ -605,6 +613,14 @@
       const id = objEl.getAttribute("data-id");
       state.selectedId = id;
       const o = selectedObj();
+      if (isMouse && !rightBtn) {
+        /* 左クリックは選択のみ。移動は右ドラッグで行う */
+        drag = null;
+        render();
+        callbacks.onSelect(o);
+        evt.preventDefault();
+        return;
+      }
       drag = { mode: "move", startPt: pt, obj: o, origX: o.x, origY: o.y };
       capture(evt);
       render();
@@ -1362,6 +1378,9 @@
       svg.addEventListener("pointerup", onPointerUp);
       svg.addEventListener("pointercancel", onPointerUp);
       svg.addEventListener("wheel", onWheel, { passive: false });
+      /* 右ドラッグでオブジェクトを移動するため、キャンバス上では
+       * ブラウザの右クリックメニューを出さない（ページ他所は通常通り） */
+      svg.addEventListener("contextmenu", (e) => e.preventDefault());
       document.addEventListener("keydown", onKeyDown);
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => render());
     },

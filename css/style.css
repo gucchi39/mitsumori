@@ -252,6 +252,10 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
   border-bottom: 1px solid var(--line); flex-wrap: wrap;
 }
 .ct-group { display: flex; gap: 4px; }
+/* マウス操作のヒント（移動＝右ドラッグ）。タッチ端末では操作が違うため出さない */
+.drag-hint { margin-left: auto; align-self: center; font-size: 11px; color: var(--sub); }
+.drag-hint b { color: var(--accent-dark); }
+@media (pointer: coarse) { .drag-hint { display: none; } }
 .canvas-toolbar button {
   background: #fff; border: 1px solid var(--line); border-radius: 7px;
   padding: 6px 11px; font-size: 12px; font-weight: 600; color: var(--ink);
@@ -268,17 +272,23 @@ main { flex: 1 1 auto; overflow-y: auto; min-height: 0; }
 #stage { width: 100%; height: 100%; touch-action: none; user-select: none; }
 #stage .obj.editable { cursor: move; }
 
+/* プリント位置バー：最初に選ぶものなのでキャンバスの上（カラム先頭）に置き、
+ * 藍地の帯で目立たせる（従来はキャンバス下で気づかれにくかった） */
 .position-bar {
   display: flex; align-items: center; gap: 12px;
-  background: #fff; border-top: 1px solid var(--line); padding: 8px 14px;
+  background: var(--tint-blue); border-bottom: 2px solid var(--accent); padding: 8px 14px;
 }
-.pb-label { font-size: 12px; font-weight: 700; color: var(--sub); flex: 0 0 auto; }
+.pb-label {
+  font-size: 13px; font-weight: 700; color: var(--accent-dark); flex: 0 0 auto;
+  display: flex; flex-direction: column; line-height: 1.3;
+}
+.pb-label small { font-size: 10px; font-weight: 600; color: var(--sub); }
 .pb-thumbs { display: flex; gap: 8px; overflow-x: auto; }
 .pos-thumb {
   border: 2px solid var(--line); background: #fff; border-radius: 8px;
   width: 76px; padding: 5px 4px 3px; flex: 0 0 auto; position: relative;
 }
-.pos-thumb.selected { border-color: var(--accent); background: var(--tint-blue); }
+.pos-thumb.selected { border-color: var(--accent); background: #fff; box-shadow: 0 1px 5px rgba(44, 78, 121, 0.28); }
 .pos-thumb svg { width: 100%; height: 44px; display: block; }
 .pos-thumb .pt-name { font-size: 10px; font-weight: 700; color: var(--sub); display: block; margin-top: 2px; }
 .pos-thumb.selected .pt-name { color: var(--accent-dark); }
