@@ -223,8 +223,8 @@ const PRODUCTS = [
       { id: "front",   name: "前面",   view: "front", x: 258, y: 250, w: 210, h: 250, mmW: 300, mmH: 360 },
       { id: "chest",   name: "左胸",   view: "front", x: 398, y: 250, w: 78,  h: 78,  mmW: 100, mmH: 100 },
       { id: "back",    name: "背面",   view: "back",  x: 235, y: 200, w: 230, h: 300, mmW: 300, mmH: 384 },
-      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 210, y: 235, w: 130, h: 120, mmW: 80, mmH: 64 },
-      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 360, y: 235, w: 130, h: 120, mmW: 80, mmH: 64 },
+      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 250, y: 170, w: 130, h: 104, mmW: 80, mmH: 64 },
+      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 320, y: 170, w: 130, h: 104, mmW: 80, mmH: 64 },
     ],
     printAreas: [
       { id: "front",   name: "前面",   view: "front", x: 225, y: 235, w: 250, h: 300, mmW: 300, mmH: 360 },
@@ -259,8 +259,8 @@ const PRODUCTS = [
       { id: "front",   name: "前面",   view: "front", x: 258, y: 250, w: 210, h: 250, mmW: 300, mmH: 360 },
       { id: "chest",   name: "左胸",   view: "front", x: 398, y: 250, w: 78,  h: 78,  mmW: 100, mmH: 100 },
       { id: "back",    name: "背面",   view: "back",  x: 235, y: 200, w: 230, h: 300, mmW: 300, mmH: 384 },
-      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 210, y: 235, w: 130, h: 120, mmW: 80, mmH: 64 },
-      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 360, y: 235, w: 130, h: 120, mmW: 80, mmH: 64 },
+      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 250, y: 170, w: 130, h: 104, mmW: 80, mmH: 64 },
+      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 320, y: 170, w: 130, h: 104, mmW: 80, mmH: 64 },
     ],
     printAreas: [
       { id: "front",   name: "前面",   view: "front", x: 225, y: 235, w: 250, h: 300, mmW: 300, mmH: 360 },
@@ -294,8 +294,8 @@ const PRODUCTS = [
       { id: "chest",   name: "左胸",   view: "front", x: 384, y: 232, w: 84,  h: 84,  mmW: 100, mmH: 100 },
       { id: "front",   name: "前面",   view: "front", x: 238, y: 296, w: 224, h: 214, mmW: 280, mmH: 255 },
       { id: "back",    name: "背面",   view: "back",  x: 240, y: 205, w: 220, h: 300, mmW: 300, mmH: 372 },
-      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 215, y: 235, w: 130, h: 115, mmW: 80,  mmH: 63 },
-      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 355, y: 235, w: 130, h: 115, mmW: 80,  mmH: 63 },
+      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 315, y: 180, w: 130, h: 102, mmW: 80,  mmH: 63 },
+      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 255, y: 180, w: 130, h: 102, mmW: 80,  mmH: 63 },
     ],
     printAreas: [
       { id: "chest",   name: "左胸",   view: "front", x: 388, y: 235, w: 85,  h: 85,  mmW: 100, mmH: 100 },
@@ -328,8 +328,8 @@ const PRODUCTS = [
     photoAreas: [
       { id: "front",   name: "前面",   view: "front", x: 250, y: 285, w: 210, h: 170, mmW: 260, mmH: 200 },
       { id: "back",    name: "背面",   view: "back",  x: 245, y: 235, w: 210, h: 250, mmW: 300, mmH: 360 },
-      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 235, y: 250, w: 120, h: 200, mmW: 75,  mmH: 140 },
-      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 345, y: 250, w: 120, h: 200, mmW: 75,  mmH: 140 },
+      { id: "sleeveL", name: "左袖",   view: "sleeveL", x: 300, y: 200, w: 120, h: 200, mmW: 75,  mmH: 140 },
+      { id: "sleeveR", name: "右袖",   view: "sleeveR", x: 280, y: 200, w: 120, h: 200, mmW: 75,  mmH: 140 },
     ],
     printAreas: [
       { id: "front",   name: "前面",   view: "front", x: 240, y: 300, w: 220, h: 170, mmW: 260, mmH: 200 },
@@ -359,12 +359,12 @@ const PRODUCTS = [
     methods: ["embroidery", "silk"],
     photoAreas: [
       { id: "capFront", name: "フロント", view: "front",   x: 285, y: 250, w: 150, h: 130, mmW: 130, mmH: 84 },
-      { id: "capSide",  name: "サイド",   view: "capSide", x: 250, y: 280, w: 150, h: 85,  mmW: 70,  mmH: 46 },
+      { id: "capSide",  name: "サイド",   view: "capSide", x: 290, y: 262, w: 150, h: 85,  mmW: 70,  mmH: 46 },
       { id: "capBack",  name: "バック",   view: "back",    x: 275, y: 300, w: 150, h: 95,  mmW: 90,  mmH: 49 },
     ],
     printAreas: [
       { id: "capFront", name: "フロント", view: "front",   x: 265, y: 300, w: 170, h: 110, mmW: 130, mmH: 84 },
-      { id: "capSide",  name: "サイド",   view: "capSide", x: 250, y: 280, w: 150, h: 85,  mmW: 70,  mmH: 46 },
+      { id: "capSide",  name: "サイド",   view: "capSide", x: 290, y: 262, w: 150, h: 85,  mmW: 70,  mmH: 46 },
       { id: "capBack",  name: "バック",   view: "back",    x: 290, y: 330, w: 120, h: 65,  mmW: 90,  mmH: 49 },
     ],
   },

@@ -453,7 +453,11 @@
 
     /* プリント範囲の枠線 */
     let areaMarkup = "";
-    if (!state.preview) {
+    /* 袖の側面ビューは写真に対して矩形枠が不自然に見えるため、点線枠と
+     * ラベルを表示しない（版面自体は生きていて、配置・採寸・クリップは従来通り。
+     * ドラッグ中の中央スナップガイドも従来通り出る） */
+    const hideAreaFrame = String(view || "").indexOf("sleeve") === 0;
+    if (!state.preview && !hideAreaFrame) {
       areaMarkup = areasInView
         .map((a) => {
           const active = area && a.id === area.id;
@@ -563,6 +567,9 @@
 
   function onPointerDown(evt) {
     if (!state.product || state.preview) return;
+    /* マウスは左ボタンのみ受け付ける（右・中クリックでのドラッグ移動を防ぐ。
+     * タッチ・ペンは button が 0/-1 のため影響しない） */
+    if (evt.pointerType === "mouse" && evt.button !== 0) return;
     pointers.set(evt.pointerId, { x: evt.clientX, y: evt.clientY });
     if (startPinchIfTwo()) { capture(evt); evt.preventDefault(); return; }
 
