@@ -62,7 +62,11 @@
      **フェザーは白製品にNG**（濃色時に白フチが出る）→半解像度縮小AAで代替。bboxクロップ（7%パディング）。
    - どうしても分離不能な局所欠陥は `eraseRects`（ソース座標）でピンポイント消去、または
      **左右対称商品なら反対側面の鏡像を採用**（Tシャツ左側面は右側面の鏡像。正当な常套手段）。
-3. `baseLum` はスクリプトが出力する値を `config.js` に転記。photoAreas はオーバーレイ（scratchpad `calib_sides.mjs`）で目視調整。
+3. `baseLum` はスクリプトが出力する値を `config.js` に転記。photoAreas は scratchpad `calib_iter.mjs`
+   （候補座標を緑枠でズーム描画）で**縫い目・シルエット端との関係まで**目視調整する。
+   「生地の上に乗っているか」だけでは不十分：**袖の版面は縫い目を越えて胴体側に掛かりやすい**
+   （ユーザー指摘済み）。仕上げに `calib_guard_test.mjs`（生地上≥98%・袖/cap側面は12px拡張でも≥97%）を通す。
+   ただしこのガードは「シルエットから外れた」しか検出できない。**縫い目の内側かはズーム画像の目視が必須**。
 4. 検証: 全色×全ビューのモンタージュ（`montage_sides.mjs`）で**濃色（紺・黒）を必ず確認**
    （切り抜きノイズは白では見えず濃色で露出する）。マゼンタ背景合成（`holecheck.mjs`）で穴・ハローを確認。
 
@@ -73,7 +77,7 @@
   （注文POST捕捉が要る回帰は `codex_server.mjs`・ポート8932）。サーバは Bash の run_in_background で起動する（`&` は死ぬ）。
 - 回帰セット: `codex5_test.mjs`(7・要8932)・`codex6_test.mjs`(5)・`codex7_test.mjs`(5)・`codex8_test.mjs`(11)・
   `codex9_test.mjs`(13)・`codex10_test.mjs`(14)・写真スモーク `smoke2.mjs`(26)・新機能 `features_test.mjs`(33)・
-  側面UI `ui3_fixes_test.mjs`(9)。コード変更時はユニット含め全部回してからコミットする。
+  側面UI `ui3_fixes_test.mjs`(9)・版面ガード `calib_guard_test.mjs`(33)。コード変更時はユニット含め全部回してからコミットする。
 
 ## 過去に直した罠（再発させない）
 
