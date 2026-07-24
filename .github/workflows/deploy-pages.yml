@@ -45,6 +45,16 @@ jobs:
             --exclude 'tests' \
             --exclude 'assets/products/src_*' \
             ./ /tmp/site/
+      # JS/CSS の参照URLへビルド版数（コミットSHA先頭8桁）を付与する。
+      # GitHub Pages は約10分キャッシュされるため、これが無いと更新直後に
+      # 「HTMLは新しいのに JS が旧版」という取り残しが起きる（実際に発生）。
+      # ローカル参照（コロンを含まないパス）のみ対象。https:// のCDN等は触らない。
+      - name: Cache-bust asset URLs (append build version)
+        run: |
+          V="${GITHUB_SHA::8}"
+          find /tmp/site -name '*.html' -print0 | xargs -0 sed -i -E \
+            "s/(src|href)=\"([^\":]+\.(js|css))\"/\1=\"\2?v=${V}\"/g"
+          grep -o 'src="[^"]*\.js[^"]*"' /tmp/site/index.html | head -5
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:

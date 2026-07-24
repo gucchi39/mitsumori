@@ -454,13 +454,11 @@
       gridMarkup = `<path d="${linesArr.join(" ")}" stroke="rgba(50,90,180,0.12)" stroke-width="1" fill="none" pointer-events="none"/>`;
     }
 
-    /* プリント範囲の枠線 */
+    /* プリント範囲の枠線。袖側面ビューも表示する：一時「ズレて見えるため
+     * 非表示」にしたが、版面座標を袖上へ再調整してズレは解消済みなので、
+     * 「どこに置けるか」の目印として正しい位置で出す（2026-07ユーザー確認） */
     let areaMarkup = "";
-    /* 袖の側面ビューは写真に対して矩形枠が不自然に見えるため、点線枠と
-     * ラベルを表示しない（版面自体は生きていて、配置・採寸・クリップは従来通り。
-     * ドラッグ中の中央スナップガイドも従来通り出る） */
-    const hideAreaFrame = String(view || "").indexOf("sleeve") === 0;
-    if (!state.preview && !hideAreaFrame) {
+    if (!state.preview) {
       areaMarkup = areasInView
         .map((a) => {
           const active = area && a.id === area.id;

@@ -12,6 +12,9 @@
   （configure-pages の enablement:true は「Resource not accessible by integration」で失敗する。実績あり・撤去済み）。
   この作業環境から `*.github.io` へのHTTP閲覧は**プロキシが403で遮断**するため、デプロイ確認は
   Actions API（run結論＋アーティファクトサイズ）で行う。curl で 000/403 でも慌てない。
+  **Pages配信は約10分キャッシュ**され、更新直後は旧JSが届くことがある（「直したはずが直ってない」報告の定番原因）。
+  deploy-pages.yml がステージング時に **JS/CSS参照へ `?v=<SHA8>` を自動付与**して対策済み（HTML側に手書きしない）。
+  ユーザーへは「数分待つか、Ctrl+F5（スマホは再読み込み）」を案内する。
 - PR #2 がレビュー用に開いている。Codex がレビューする（ユーザーが `@codex review` とコメント→結果はwebhookで届く）。
   指摘は1件ずつコード上で再現・精査してから直す。妥当なら修正＋専用E2Eを足す。GitHubへのコメントは最小限。
 - コミットメッセージ・PR・コードに **モデルIDを書かない**（チャット返信のみ可）。
@@ -70,7 +73,7 @@
   （注文POST捕捉が要る回帰は `codex_server.mjs`・ポート8932）。サーバは Bash の run_in_background で起動する（`&` は死ぬ）。
 - 回帰セット: `codex5_test.mjs`(7・要8932)・`codex6_test.mjs`(5)・`codex7_test.mjs`(5)・`codex8_test.mjs`(11)・
   `codex9_test.mjs`(13)・`codex10_test.mjs`(14)・写真スモーク `smoke2.mjs`(26)・新機能 `features_test.mjs`(33)・
-  側面UI `ui3_fixes_test.mjs`(8)。コード変更時はユニット含め全部回してからコミットする。
+  側面UI `ui3_fixes_test.mjs`(9)。コード変更時はユニット含め全部回してからコミットする。
 
 ## 過去に直した罠（再発させない）
 
