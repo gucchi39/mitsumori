@@ -336,6 +336,32 @@
     return renderMockup(product.mockup, colorHex, view);
   }
 
+  /* ---------------- モデル着用イメージ（実写・服だけ色替え） ----------------
+   * wornPhotos[view] = { base, shirt, lum, img:{x,y,w,h}, map:{x,y,w,h} }
+   *  - base : 人物全体の切り抜き写真（肌・髪・パンツは元の色のまま表示）
+   *  - shirt: シャツ生地だけを抜いた同位置レイヤー。photoTintFilter で選択色に着色
+   *  - img  : ステージ(700x760)上の描画位置
+   *  - map  : この面のデザイン（実効版面座標）を写像する先の矩形。
+   *           縦横比は必ず実効版面と同じにする（デザインが歪まないように） */
+  function wornFor(product, view) {
+    const wp = product && product.wornPhotos;
+    return (wp && wp[view || "front"]) || null;
+  }
+
+  function renderWornMockup(product, colorHex, colorId, view) {
+    const w = wornFor(product, view);
+    if (!w) return "";
+    const e = (u) => String(u).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    /* フィルタIDは商品・面・色で一意（fragment IDは文書全体で解決されるため） */
+    const tid = "wtint-" + String((product.id || "p") + "-" + (view || "front") + "-" + (colorId || "x")).replace(/[^a-z0-9_-]/gi, "");
+    const at = `x="${w.img.x}" y="${w.img.y}" width="${w.img.w}" height="${w.img.h}" preserveAspectRatio="xMidYMid meet"`;
+    return `<g class="mockup worn-photo"><defs>${photoTintFilter(tid, colorHex, w.lum)}</defs>
+      <ellipse cx="350" cy="742" rx="230" ry="16" fill="rgba(40,34,26,0.14)"/>
+      <image href="${e(w.base)}" xlink:href="${e(w.base)}" ${at}/>
+      <image href="${e(w.shirt)}" xlink:href="${e(w.shirt)}" ${at} filter="url(#${tid})"/>
+    </g>`;
+  }
+
   /* ---------------- 着用イメージ（背景＋トルソー） ----------------
    * 商品の「後ろ」に置く、スタジオ背景と首・肩のマネキン形。
    * アパレルは着用感、キャップは頭にかぶせた感じを演出します。 */
@@ -377,5 +403,5 @@
 
   function isWearable(product) { return !!(product && WEARABLE[product.mockup]); }
 
-  globalThis.Mockups = { renderMockup, renderProductMockup, photoFor, wornBackdrop, isWearable, shade };
+  globalThis.Mockups = { renderMockup, renderProductMockup, photoFor, wornBackdrop, wornFor, renderWornMockup, isWearable, shade };
 })();

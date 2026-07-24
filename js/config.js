@@ -213,6 +213,14 @@ const PRODUCTS = [
       sleeveL: "assets/products/tshirt_sideL.png",
       sleeveR: "assets/products/tshirt_sideR.png",
     },
+    /* モデル着用写真（実写）。base=人物全体 / shirt=シャツ生地のみ（着色対象）。
+     * img=ステージ配置、map=デザイン写像先（縦横比は実効版面と一致させる） */
+    wornPhotos: {
+      front:   { base: "assets/products/worn_front.png",  shirt: "assets/products/worn_front_shirt.png",  lum: 0.839, img: { x: 120, y: -12, w: 460, h: 780 }, map: { x: 225, y: 265, w: 250, h: 298 } },
+      back:    { base: "assets/products/worn_back.png",   shirt: "assets/products/worn_back_shirt.png",   lum: 0.815, img: { x: 136, y: -12, w: 429, h: 780 }, map: { x: 230, y: 250, w: 240, h: 313 } },
+      sleeveL: { base: "assets/products/worn_sideL.png",  shirt: "assets/products/worn_sideL_shirt.png",  lum: 0.787, img: { x: 232, y: -12, w: 235, h: 780 }, map: { x: 280, y: 330, w: 100, h: 80 } },
+      sleeveR: { base: "assets/products/worn_sideR.png",  shirt: "assets/products/worn_sideR_shirt.png",  lum: 0.778, img: { x: 240, y: -12, w: 221, h: 780 }, map: { x: 310, y: 330, w: 100, h: 80 } },
+    },
     sizes: ["S", "M", "L", "XL", "XXL"],
     sizeSurcharge: { XXL: 110 },
     colors: pick("white", "black", "navy", "red", "royal", "daisy", "forest", "gray", "burgundy", "pink"),
@@ -249,6 +257,14 @@ const PRODUCTS = [
       back: "assets/products/tshirt_back.png",
       sleeveL: "assets/products/tshirt_sideL.png",
       sleeveR: "assets/products/tshirt_sideR.png",
+    },
+    /* モデル着用写真（実写）。base=人物全体 / shirt=シャツ生地のみ（着色対象）。
+     * img=ステージ配置、map=デザイン写像先（縦横比は実効版面と一致させる） */
+    wornPhotos: {
+      front:   { base: "assets/products/worn_front.png",  shirt: "assets/products/worn_front_shirt.png",  lum: 0.839, img: { x: 120, y: -12, w: 460, h: 780 }, map: { x: 225, y: 265, w: 250, h: 298 } },
+      back:    { base: "assets/products/worn_back.png",   shirt: "assets/products/worn_back_shirt.png",   lum: 0.815, img: { x: 136, y: -12, w: 429, h: 780 }, map: { x: 230, y: 250, w: 240, h: 313 } },
+      sleeveL: { base: "assets/products/worn_sideL.png",  shirt: "assets/products/worn_sideL_shirt.png",  lum: 0.787, img: { x: 232, y: -12, w: 235, h: 780 }, map: { x: 280, y: 330, w: 100, h: 80 } },
+      sleeveR: { base: "assets/products/worn_sideR.png",  shirt: "assets/products/worn_sideR_shirt.png",  lum: 0.778, img: { x: 240, y: -12, w: 221, h: 780 }, map: { x: 310, y: 330, w: 100, h: 80 } },
     },
     sizes: ["S", "M", "L", "XL", "XXL"],
     sizeSurcharge: { XXL: 110 },

@@ -441,10 +441,15 @@
       .join("");
     const defs = clipDefs + (fx ? FX_DEFS : "");
 
-    /* 着用イメージ：商品の背後にスタジオ背景＋トルソー（前面・背面のみ） */
-    const backdrop = fx && state.worn && (view === "front" || view === "back") ? Mockups.wornBackdrop(state.product, view) : "";
-    const rawMockup = Mockups.renderProductMockup(state.product, bodyHex(), state.colorId, view);
-    const mockup = fx ? `<g filter="url(#fxGarment)">${rawMockup}</g>` : rawMockup;
+    /* 着用イメージ：
+     *  - モデル着用写真（wornPhotos）がある商品 → 実写の人物＋服だけ色替えで表示
+     *  - 無い商品（イラスト表示）→ 従来のスタジオ背景＋トルソー演出 */
+    const wornPhoto = state.worn && Mockups.wornFor ? Mockups.wornFor(state.product, view) : null;
+    const backdrop = !wornPhoto && fx && state.worn && (view === "front" || view === "back") ? Mockups.wornBackdrop(state.product, view) : "";
+    const rawMockup = wornPhoto
+      ? Mockups.renderWornMockup(state.product, bodyHex(), state.colorId, view)
+      : Mockups.renderProductMockup(state.product, bodyHex(), state.colorId, view);
+    const mockup = fx && !wornPhoto ? `<g filter="url(#fxGarment)">${rawMockup}</g>` : rawMockup;
 
     let gridMarkup = "";
     if (state.showGrid && !state.preview) {
@@ -474,7 +479,7 @@
 
     /* オブジェクト（同じビューの他の位置のデザインも表示する）。
      * 加工方法ごとのリアル質感フィルタを位置グループ単位で適用（画面のみ）。 */
-    const objectsMarkup = areasInView
+    let objectsMarkup = areasInView
       .map((a) => {
         const d = state.designs[a.id];
         if (!d || !d.objects.length) return "";
@@ -483,6 +488,20 @@
         return `<g clip-path="url(#clip-${a.id})"><g${filt}>${d.objects.map((o) => objMarkup(o, editable)).join("")}</g></g>`;
       })
       .join("");
+
+    /* モデル着用表示では、版面座標のデザインを着用写真上のプリント面（map）へ
+     * アフィン写像する。基準はビューと同名の実効版面（front/back/sleeveL/sleeveR）。
+     * map の縦横比は版面と揃えてあるため sx≒sy（歪まない）。クリップ矩形も
+     * 変換グループ内で解決されるので、プリント範囲外は着用写真上でも切れる */
+    if (wornPhoto && objectsMarkup) {
+      const anchor = areasInView.find((a) => a.id === view) || areasInView[0];
+      if (anchor && wornPhoto.map) {
+        const m = wornPhoto.map;
+        const sx = m.w / anchor.w, sy = m.h / anchor.h;
+        const tx = m.x - anchor.x * sx, ty = m.y - anchor.y * sy;
+        objectsMarkup = `<g transform="translate(${Math.round(tx * 100) / 100} ${Math.round(ty * 100) / 100}) scale(${Math.round(sx * 10000) / 10000} ${Math.round(sy * 10000) / 10000})">${objectsMarkup}</g>`;
+      }
+    }
 
     svg.innerHTML = `<defs>${defs}</defs>${backdrop}${mockup}${gridMarkup}<g id="objectLayer">${objectsMarkup}</g>${areaMarkup}<g id="selLayer"></g>`;
     applyViewBox();
@@ -1013,6 +1032,11 @@
 
   function getPlacementsInner() {
     const savedArea = state.areaId;
+    /* 採寸中は着用表示を一時解除する。着用モードはオブジェクトを縮小グループ内に
+     * 描くため、ブラウザの文字レンダリング誤差で getBBox が1%弱ブレることがあり、
+     * サイズ区分の境界で見積が揺れるのを防ぐ（採寸後に元へ戻す） */
+    const savedWorn = state.worn;
+    if (savedWorn) { state.worn = false; render(); }
     const result = [];
     for (const a of productAreas()) {
       const d = state.designs[a.id];
@@ -1096,7 +1120,8 @@
         objectCount: visibleCount,
       });
     }
-    if (savedArea !== state.areaId) {
+    if (savedWorn) state.worn = true;
+    if (savedArea !== state.areaId || savedWorn) {
       state.areaId = savedArea;
       render();
     }
