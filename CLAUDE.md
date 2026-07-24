@@ -68,8 +68,9 @@
 - ユニット: `node --test tests/quote.test.js`（13件）
 - E2E: scratchpad に Playwright スクリプト群。静的サーバは `python3 -m http.server 8945`
   （注文POST捕捉が要る回帰は `codex_server.mjs`・ポート8932）。サーバは Bash の run_in_background で起動する（`&` は死ぬ）。
-- 回帰セット: `codex5_test.mjs`(7)・`codex6_test.mjs`(5)・`codex7_test.mjs`(5)・写真スモーク `smoke2.mjs`(26)。
-  コード変更時はこれを全部回してからコミットする。
+- 回帰セット: `codex5_test.mjs`(7・要8932)・`codex6_test.mjs`(5)・`codex7_test.mjs`(5)・`codex8_test.mjs`(11)・
+  `codex9_test.mjs`(13)・`codex10_test.mjs`(14)・写真スモーク `smoke2.mjs`(26)・新機能 `features_test.mjs`(33)・
+  側面UI `ui3_fixes_test.mjs`(7)。コード変更時はユニット含め全部回してからコミットする。
 
 ## 過去に直した罠（再発させない）
 
@@ -102,6 +103,18 @@
   `setBodyColor` が版面ジオメトリの変化を検知し `remapDesignsForAreaChange` で
   オブジェクトを新版面へ写像（相対位置維持・px/mm補正で実寸不変）。この仕組みを壊さない。
 - E2Eの共有リンクテストは **送信側と別の browser context** で開く（同一contextだとlocalStorageを共有して偽陽性）。
+- **migrateOffAreaObjects（読込時の範囲外救済）は実効版面（productAreas）で判定**（Codex 10巡目）。
+  printAreas優先の判定に戻すと、写真版面（袖 y170等）に正しく置かれた保存データが「範囲外」扱いされ
+  版面中央へ誤移動→リロードで消える。load() は colorId 設定後に migrate を呼ぶ順序も前提。
+- **採寸の縦mm換算は pxPerMmY（a.h/a.mmH）**（getPlacements の heightMm・minTextMm）。photoAreas は
+  遠近で縦横の px/mm が違う（capサイド16%差）。横比率で縦を割ると見積・指示書・潰れ判定が実物とズレる
+  （exportSVG は mmW×mmH 出力なのでそちらが正）。
+- **背景透過・元に戻すの適用先は「依頼時のオブジェクトID」**（`Editor.updateObjectById`）。
+  updateSelected に戻すと、非同期処理中に選択が移った場合に別オブジェクトを上書きする。
+  対象が削除済みなら警告トーストのみ（成功トーストを出さない）。
+- **注文本文の添付案内は ORDER.attachFiles に連動**（orderText）。OFF運用で「添付します」と書くと
+  店舗が存在しないファイルを待つ。setup.html のテスト送信は attachFiles 時に**小さなZIPを実際に添付**して
+  「本文は通るが添付で落ちる」プラン制限を開業前に検出する。
 
 ## その他
 

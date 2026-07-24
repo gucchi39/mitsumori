@@ -107,9 +107,12 @@
    * あるエリアのオブジェクト群の中心がそのプリント範囲から大きく外れていたら、
    * 相対配置を保ったまま範囲中央へ平行移動する（クリップで消えるのを防ぐ）。 */
   function migrateOffAreaObjects(product) {
-    const areas = [...(product.printAreas || []), ...(product.photoAreas || [])];
+    /* 判定は「実効版面」（写真表示中は photoAreas、無ければ printAreas。表示・
+     * クリップと同じ判定）に対して行う。printAreas 優先で判定すると、写真版面に
+     * 正しく置かれた保存データが「範囲外」扱いされて版面中央へ誤移動し、
+     * リロード後にクリップで消える（load は colorId 設定後に呼ぶこと） */
     const areaById = {};
-    for (const a of areas) if (!areaById[a.id]) areaById[a.id] = a;
+    for (const a of productAreas(product)) areaById[a.id] = a;
     for (const [areaId, d] of Object.entries(state.designs || {})) {
       const a = areaById[areaId];
       if (!a || !d.objects || !d.objects.length) continue;
@@ -846,6 +849,19 @@
     }
   }
 
+  /* 選択状態に依存せず、オブジェクトIDを指定して更新する。背景透過など
+   * 非同期処理の完了時に使う：処理中に別オブジェクトへ選択が移っていても、
+   * 依頼時点の画像にだけ適用するため（updateSelected だと今選択中のものを
+   * 誤って書き換える）。見つからなければ false（削除済み等） */
+  function updateObjectById(id, props) {
+    if (!id) return false;
+    for (const d of Object.values(state.designs || {})) {
+      const o = (d.objects || []).find((x) => x.id === id);
+      if (o) { Object.assign(o, props); commit(); return true; }
+    }
+    return false;
+  }
+
   function deleteSelected() {
     const o = selectedObj();
     if (!o) return;
@@ -1002,6 +1018,11 @@
       let minTextMm = Infinity;   // 最小の文字高さ(mm)。刺繍の潰れ判定に使う
       let visibleCount = 0;       // プリント範囲に少しでも掛かるオブジェクト数
       const pxPerMm = a.w / a.mmW;
+      /* 縦は縦の比率で換算する。写真版面（photoAreas）は遠近の関係で
+       * 横と縦の px/mm が一致しない（capサイド等で最大16%差）。横比率で
+       * 縦を割ると見積サイズ・指示書・潰れ判定が実物とズレる。
+       * exportSVG は mmW×mmH で出力するため、こちらが実寸の正 */
+      const pxPerMmY = a.h / a.mmH;
       const ax2 = a.x + a.w, ay2 = a.y + a.h;
 
       for (const o of d.objects) {
@@ -1031,7 +1052,7 @@
             const divisor = o.vertical
               ? Math.max(1, lines.reduce((m, s) => Math.max(m, s.length), 1))
               : Math.max(1, lines.length);
-            const hMm = (bb.h / divisor) / pxPerMm;
+            const hMm = (bb.h / divisor) / pxPerMmY;
             minTextMm = Math.min(minTextMm, hMm);
           }
         }
@@ -1043,7 +1064,7 @@
       if (visibleCount === 0) continue; // 範囲内に何も無い＝無地扱い（加工費なし）
 
       const wMm = Math.max(0, (maxX - minX) / pxPerMm);
-      const hMm = Math.max(0, (maxY - minY) / pxPerMm);
+      const hMm = Math.max(0, (maxY - minY) / pxPerMmY);
 
       result.push({
         areaId: a.id,
@@ -1464,7 +1485,7 @@
     get worn() { return state.worn; },
 
     addText, addStamp, addImage,
-    updateSelected, deleteSelected, reorderSelected, selectObject,
+    updateSelected, updateObjectById, deleteSelected, reorderSelected, selectObject,
     duplicateSelected, centerSelected, flipSelected,
     applyTemplate, templateThumbSVG,
     undo, redo,

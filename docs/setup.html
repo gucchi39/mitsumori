@@ -143,6 +143,24 @@
     `<li class="${i.level}"><span class="mark">${i.level==="ok"?"✅":i.level==="warn"?"⚠":"✕"}</span><span><b>${i.label}</b><br><span style="color:var(--sub);font-size:12.5px">${i.detail}</span></span></li>`).join("");
 
   /* テスト送信 */
+  /* 依存無しの最小ZIP（store方式・1ファイル）。本番の注文送信は attachFiles 時に
+   * ZIPを添付するため、テストも同じ「ファイル付き送信」で検証する（本文だけ通って
+   * 添付で落ちるプラン制限・設定ミスを開業前に発見するため） */
+  function tinyZip(name, text) {
+    const enc = new TextEncoder(), nm = enc.encode(name), data = enc.encode(text);
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < data.length; i++) { c ^= data[i]; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; }
+    const crc = (c ^ 0xFFFFFFFF) >>> 0;
+    const u16 = v => new Uint8Array([v & 255, (v >> 8) & 255]);
+    const u32 = v => new Uint8Array([v & 255, (v >> 8) & 255, (v >> 16) & 255, (v >>> 24) & 255]);
+    const local = [u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
+      u32(crc), u32(data.length), u32(data.length), u16(nm.length), u16(0), nm, data];
+    const lsize = 30 + nm.length + data.length;
+    const central = [u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0),
+      u32(crc), u32(data.length), u32(data.length), u16(nm.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(0), nm];
+    const csize = 46 + nm.length;
+    return new Blob([...local, ...central, u32(0x06054b50), u16(0), u16(0), u16(1), u16(1), u32(csize), u32(lsize), u16(0)], { type: "application/zip" });
+  }
   const btn = document.getElementById("btnTest");
   const out = document.getElementById("testResult");
   btn.addEventListener("click", async () => {
@@ -155,9 +173,12 @@
       const fd = new FormData();
       fd.append("orderNo", "TEST-" + Math.floor(Math.random()*9000+1000));
       fd.append("subject", "【テスト送信】デザインシミュレーター受信確認");
-      fd.append("message", "これは開業前チェックページからのテスト送信です。受信できていれば設定は正常です。");
+      fd.append("message", "これは開業前チェックページからのテスト送信です。受信できていれば設定は正常です。" +
+        (ORDER.attachFiles ? "小さなZIPファイルを添付しています（実際の注文と同じ添付付き送信の確認用）。" : ""));
       fd.append("email", ORDER.toEmail || SHOP.email || "");
       if (ORDER.provider === "web3forms" && ORDER.accessKey) fd.append("access_key", ORDER.accessKey);
+      /* 実際の注文（postOrder）と同じく添付ファイル付きで送る */
+      if (ORDER.attachFiles) fd.append("attachment", tinyZip("test.txt", "ミツモリ 添付テスト"), "TEST_添付テスト.zip");
       const res = await fetch(ORDER.endpoint, { method: "POST", body: fd, headers: { Accept: "application/json" } });
       /* 本番の注文送信（postOrder）と同じ判定：HTTP 200 でも本文が
        * {success:false} 等ならエラー扱いにする（web3forms等は200で失敗を返す） */
@@ -170,7 +191,7 @@
         }
       } catch (e) { /* JSONでない応答はHTTPステータスのみで判定 */ }
       out.innerHTML = (res.ok && bodyOk)
-        ? '<span style="color:var(--ok)">✅ 送信成功。受信メールボックスをご確認ください。</span>'
+        ? `<span style="color:var(--ok)">✅ 送信成功${ORDER.attachFiles ? "（添付ファイル付き）" : "（本文のみ・添付送信はOFF設定）"}。受信メールボックスをご確認ください。</span>`
         : (res.ok
           ? `<span style="color:var(--err)">✕ 送信失敗（${providerMsg}）。アクセスキー・設定をご確認ください。</span>`
           : `<span style="color:var(--err)">✕ 送信失敗（HTTP ${res.status}）。エンドポイントURL・プラン制限をご確認ください。</span>`);

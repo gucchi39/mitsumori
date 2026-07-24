@@ -585,25 +585,36 @@
   function bindBgRemove(selImg) {
     const btn = $("#btnBgRemove");
     const restore = $("#btnBgRestore");
+    /* 適用は「今選択中のもの」ではなくボタンを押した時点の画像へIDで行う。
+     * 処理は非同期で数秒かかることがあり、その間に選択が別オブジェクトへ
+     * 移ると updateSelected では無関係なオブジェクトを上書きしてしまう */
+    const objId = selImg.id;
     if (btn) btn.addEventListener("click", async () => {
       btn.disabled = true; btn.textContent = "処理中…";
       const tol = Number($("#bgTol").value) || 32;
-      const res = await stripImageBackground(selImg.href, tol);
+      const src = { href: selImg.href, natW: selImg.natW, natH: selImg.natH };
+      const res = await stripImageBackground(src.href, tol);
       btn.disabled = false; btn.textContent = "✨ 背景を消す";
       if (!res || res.removedPct === 0) { toast("背景らしい部分が見つかりませんでした（すでに透過済みの画像かもしれません）", "warn"); return; }
       if (res.removedPct > 92) { toast("画像のほぼ全体が背景と判定されたため中止しました。「弱」でお試しください", "warn"); return; }
-      if (!app.bgBackup[selImg.id]) app.bgBackup[selImg.id] = { href: selImg.href, natW: selImg.natW, natH: selImg.natH };
       /* 長辺1600px超は処理時に縮小されるため、natW/natH も実データに合わせて更新する。
        * 据え置くと getPlacements の実効DPI計算が過大になり、低解像度警告が出なくなる */
-      Editor.updateSelected({ href: res.dataUrl, natW: res.w, natH: res.h });
+      if (!Editor.updateObjectById(objId, { href: res.dataUrl, natW: res.w, natH: res.h })) {
+        toast("対象の画像が見つかりませんでした（削除された可能性があります）", "warn");
+        return;
+      }
+      if (!app.bgBackup[objId]) app.bgBackup[objId] = src;
       renderToolPanel();
       toast(`背景を透過しました（画像の約${res.removedPct}%）。戻すときは「元に戻す」へ`);
     });
     if (restore) restore.addEventListener("click", () => {
-      const orig = app.bgBackup[selImg.id];
+      const orig = app.bgBackup[objId];
       if (!orig) return;
-      Editor.updateSelected({ href: orig.href, natW: orig.natW, natH: orig.natH });
-      delete app.bgBackup[selImg.id];
+      if (!Editor.updateObjectById(objId, { href: orig.href, natW: orig.natW, natH: orig.natH })) {
+        toast("対象の画像が見つかりませんでした（削除された可能性があります）", "warn");
+        return;
+      }
+      delete app.bgBackup[objId];
       renderToolPanel();
       toast("元の画像に戻しました");
     });
@@ -1113,7 +1124,15 @@
       order.roster.forEach((e, i) => L.push(`${i + 1}. ${e.name}　背番号${e.number}　${e.size}`));
     }
     L.push("", `概算合計：${order.amountTotal != null ? Quote.yen(order.amountTotal) + "（税込）" : "未計算"}`);
-    L.push("", "※ デザインの入稿データ（SVG）とプレビュー、デザインデータ(JSON)を添付します。");
+    /* 添付の案内は設定に合わせる。attachFiles=false 運用（アップロード容量
+     * 制限の回避など）で「添付します」と書くと、受け取った店舗が存在しない
+     * 製作データを待ってしまう */
+    if (CONFIG.ORDER.attachFiles) {
+      L.push("", "※ デザインの入稿データ（SVG）とプレビュー、指示書、デザインデータ(JSON)を添付します。");
+    } else {
+      L.push("", "※ 店舗の設定により、このご注文に製作データは添付されません。",
+        "   製作データが必要な場合は、注文番号を添えてお客様に保存データ（共有リンク／JSONファイル）の提供をご依頼ください。");
+    }
     return L.join("\n");
   }
 
