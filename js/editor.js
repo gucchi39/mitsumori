@@ -979,10 +979,14 @@
     }
     const rad = (obj.rotation * Math.PI) / 180;
     const cos = Math.cos(rad), sin = Math.sin(rad);
+    /* 左右反転（flipX）は描画で最内の scale(-1 1)。採寸でも各頂点のxを反転して
+     * おかないと、原点から外れた非対称スタンプを反転したとき、実際の絵は反対側へ
+     * 鏡像されるのに採寸は元側をクリップ・計測して幅や見切れがズレる（Codex 12巡目）。 */
+    const fx = obj.flipX ? -1 : 1;
     const corners = [
       [x, y], [x + width, y], [x, y + height], [x + width, y + height],
     ].map(([px, py]) => {
-      const sx = px * obj.scale, sy = py * obj.scale;
+      const sx = (px * fx) * obj.scale, sy = py * obj.scale;
       return [obj.x + sx * cos - sy * sin, obj.y + sx * sin + sy * cos];
     });
     const xs = corners.map((c) => c[0]), ys = corners.map((c) => c[1]);
@@ -1514,6 +1518,18 @@
     zoomFit() { state.panX = 0; state.panY = 0; Editor.setZoom(1); },
     toggleGrid() { state.showGrid = !state.showGrid; render(); return state.showGrid; },
     togglePreview() {
+      /* 着用表示中に「仕上がり」を押したら、着用モードを解除して編集へ戻す。
+       * worn を残したまま preview=false にすると、オブジェクトが着用写真用の
+       * アフィン変換の中に描かれたまま編集可能になり、右ドラッグで実際の版面
+       * 座標が歪む（Codex 12巡目）。 */
+      if (state.worn) {
+        state.worn = false;
+        state.preview = false;
+        state.selectedId = null;
+        render();
+        callbacks.onSelect(null);
+        return false;
+      }
       state.preview = !state.preview;
       if (state.preview) state.selectedId = null;
       render();

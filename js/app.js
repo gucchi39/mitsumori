@@ -83,6 +83,8 @@
     $("#btnPreview").addEventListener("click", (e) => {
       const on = Editor.togglePreview();
       e.currentTarget.classList.toggle("on", on);
+      /* 着用中の仕上がり押下は着用も解除されるため、着用ボタンの表示も同期 */
+      $("#btnWorn").classList.toggle("on", Editor.state.worn);
     });
     $("#btnWorn").addEventListener("click", (e) => {
       const on = Editor.toggleWorn();
@@ -856,8 +858,13 @@
    * 実際の名前・番号に差し替えた各案を測り、エリアごとに最大サイズを採る。
    * 長い名前がプリント範囲を超える／上のサイズ区分に入る場合も見積・警告へ反映する。 */
   function rosterMaxPlacements(base) {
+    /* 差し込み後（実名・実番号）のメンバー版だけを測って最大を採る。
+     * base（差し込み前の {名前}/{番号} テンプレ）で byArea を初期化すると、
+     * 実際の名前がプレースホルダー文字より短い場合でもテンプレ寸法が下限として
+     * 残り、見積が1段上のサイズ区分に入ったり誤った超過警告が出る（Codex 12巡目）。
+     * memberDesigns は全エリアを含む（プレースホルダーの無い静的エリアも同じ内容で
+     * 出る）ため、メンバー版だけでベース相当を網羅できる。 */
     const byArea = {};
-    for (const pl of base) byArea[pl.areaId] = { ...pl };
     for (const e of rosterMeasureEntries()) {
       const pls = Editor.getPlacements(memberDesigns(e));
       for (const pl of pls) {
@@ -867,7 +874,8 @@
         b.heightMm = Math.max(b.heightMm, pl.heightMm);
       }
     }
-    return Object.values(byArea);
+    /* 有効メンバーが1人も測れなかった場合のみ base にフォールバック（空版面回避） */
+    return Object.keys(byArea).length ? Object.values(byArea) : base;
   }
 
   function refreshQuote() {
@@ -1264,6 +1272,14 @@
     return app.roster.active && app.roster.entries.length > 0;
   }
 
+  /* 「名簿を使う」にチェックが入っているのに名簿が空の状態。
+   * rosterActive() が false になり名簿バリデーション（差し込み文字・サイズ）を
+   * 素通りするため、{名前}/{番号} のまま注文・書き出しされる穴になる（Codex 12巡目）。
+   * この状態は注文・入稿書き出しの両方でブロックする。 */
+  function rosterCheckedButEmpty() {
+    return !!(app.roster && app.roster.active && app.roster.entries.length === 0);
+  }
+
   /* 保存/自動保存からの名簿復元（UIにも反映） */
   function restoreRoster(r) {
     if (!r || typeof r !== "object") { app.roster = { active: false, entries: [] }; return; }
@@ -1527,6 +1543,7 @@
     if (!p) return;
     const areas = Editor.designAreas();
     if (!areas.length) { toast("先にデザインを作成してください", "warn"); return; }
+    if (rosterCheckedButEmpty()) { toast("「名簿を使う」にチェックがありますが名簿が空です。名前・番号・サイズを入力してください", "warn"); return; }
     const no = orderNumber();
     let n = 0;
 
@@ -1673,7 +1690,8 @@
     if (!hasAnyDesign()) errs.push("デザインが作成されていません。");
     const eq = effectiveQuantities();
     const totalQty = p ? p.sizes.reduce((s, sz) => s + cleanQty(eq[sz]), 0) : 0;
-    if (totalQty < 1) errs.push(rosterActive() ? "名簿が空です。名前・番号・サイズを入力してください。" : "数量が入力されていません。");
+    if (rosterCheckedButEmpty()) errs.push("「名簿を使う」にチェックが入っていますが、名簿が空です。名前・番号・サイズを入力するか、チェックを外してください。");
+    else if (totalQty < 1) errs.push(rosterActive() ? "名簿が空です。名前・番号・サイズを入力してください。" : "数量が入力されていません。");
     if (rosterActive()) {
       const bad = rosterBadRows();
       if (bad.length) errs.push(`名簿にサイズが不明な行が${bad.length}行あります（${bad.map((b) => `${b.row}行目「${b.size || "未入力"}」`).join("、")}）。この商品のサイズ：${p ? p.sizes.join(" / ") : ""}`);

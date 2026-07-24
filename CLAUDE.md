@@ -100,7 +100,7 @@
 - E2E: scratchpad に Playwright スクリプト群。静的サーバは `python3 -m http.server 8945`
   （注文POST捕捉が要る回帰は `codex_server.mjs`・ポート8932）。サーバは Bash の run_in_background で起動する（`&` は死ぬ）。
 - 回帰セット: `codex5_test.mjs`(7・要8932)・`codex6_test.mjs`(5)・`codex7_test.mjs`(5)・`codex8_test.mjs`(11)・
-  `codex9_test.mjs`(13)・`codex10_test.mjs`(14)・`codex11_test.mjs`(7)・写真スモーク `smoke2.mjs`(26)・新機能 `features_test.mjs`(33)・
+  `codex9_test.mjs`(13)・`codex10_test.mjs`(14)・`codex11_test.mjs`(7)・`codex12_test.mjs`(10)・写真スモーク `smoke2.mjs`(26)・新機能 `features_test.mjs`(33)・
   側面UI `ui3_fixes_test.mjs`(11)・版面ガード `calib_guard_test.mjs`(33)・着用 `worn_test.mjs`(21)。
   コード変更時はユニット含め全部回してからコミットする。
 
@@ -161,6 +161,19 @@
   実写と混ざり「袖から肌色がはみ出す」破綻を起こすため。モデル着用写真（服だけマスク着色）対応時に再有効化する。
 - プリント位置バー（.position-bar）は**キャンバス上部**（canvas-col の先頭）。「最初に選ぶものが下にあって
   見つけづらい」というユーザー指摘による配置。下へ戻さない。
+- **着用ON中に「仕上がり」を押したら着用を解除して編集へ戻す**（editor.js togglePreview・Codex 12巡目）。
+  worn を残したまま preview=false にすると、オブジェクトが着用写真用アフィン変換の中で編集可能になり
+  右ドラッグで版面座標が歪む。btnPreview ハンドラは #btnWorn の点灯も同期する。
+- **採寸（objStageBBox）は flipX を各頂点のx反転で反映**（Codex 12巡目）。描画は最内 scale(-1 1)。
+  原点から外れた非対称スタンプ（例:音符 bbox中心x+14.4）を反転すると絵が反対側へ鏡像されるため、
+  採寸も反転しないとクリップ幅・見切れがズレる。flipSelected はテキスト非対象（スタンプ/画像のみ）。
+- **名簿の最大採寸（rosterMaxPlacements）はメンバー版のみで初期化**（Codex 12巡目）。base（差し込み前
+  {名前}/{番号}テンプレ）で byArea を初期化すると、実名がプレースホルダーより短くてもテンプレ寸法が
+  下限に残り見積が過大になる。memberDesigns は全エリアを含むためメンバー版だけで網羅できる（有効メンバー
+  ゼロ時のみ base フォールバック）。
+- **「名簿を使う」チェックのみで空（rosterCheckedButEmpty）は注文・入稿書き出しをブロック**（Codex 12巡目）。
+  rosterActive() は entries>0 が条件のため、チェックONだけだと名簿バリデーションを素通りして
+  {名前}/{番号} のまま出力される穴になる。validateOrder と downloadProductionSet の両方でガード。
 
 ## その他
 
