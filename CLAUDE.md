@@ -95,7 +95,7 @@
 - E2E: scratchpad に Playwright スクリプト群。静的サーバは `python3 -m http.server 8945`
   （注文POST捕捉が要る回帰は `codex_server.mjs`・ポート8932）。サーバは Bash の run_in_background で起動する（`&` は死ぬ）。
 - 回帰セット: `codex5_test.mjs`(7・要8932)・`codex6_test.mjs`(5)・`codex7_test.mjs`(5)・`codex8_test.mjs`(11)・
-  `codex9_test.mjs`(13)・`codex10_test.mjs`(14)・写真スモーク `smoke2.mjs`(26)・新機能 `features_test.mjs`(33)・
+  `codex9_test.mjs`(13)・`codex10_test.mjs`(14)・`codex11_test.mjs`(7)・写真スモーク `smoke2.mjs`(26)・新機能 `features_test.mjs`(33)・
   側面UI `ui3_fixes_test.mjs`(11)・版面ガード `calib_guard_test.mjs`(33)・着用 `worn_test.mjs`(11)。
   コード変更時はユニット含め全部回してからコミットする。
 
@@ -108,14 +108,17 @@
 - 名簿注文の添付に **プレースホルダー入り基本版下を含めない**（`buildOrderFiles` は rosterActive&&hasPlaceholders で
   メンバー個別SVGのみ）。手動書き出し `downloadProductionSet` と挙動を揃える。
 - 注文送信の成功判定は `res.ok` だけでなく **レスポンスJSONの success/ok/status も見る**（web3formsは200でfalseを返す）。
-- 共有リンクの自動保存ガード: `onChange` が60msデバウンスされるため、ガードは `autosave` 本体に実装
-  （`shareLocked`/`shareLoadPending`。受け手の実編集で初めて解除）。タイミング依存の実装に戻さない。
+- 共有リンクの自動保存ガード: `onChange` が60msデバウンスされるため、ガードは `autosave` 本体に実装。
+  判定は**内容指紋（shareFingerprint＝デザイン＋数量＋名簿）の比較**（Codex 11巡目で
+  「1回読み飛ばし」方式から変更。読込直後500ms内の最初の編集がデバウンス窓で読込と合流しても保存される）。
+  タイミング依存の実装に戻さない。
 - web3forms は添付1つのみ → 依存無しZIP（`zipStore`・store方式）に束ねる。
 - 注文番号は `ORD-YYYYMMDD-HHMMSS-NNN`（crypto乱数）。`Date.now()%9000` に戻さない。
   **リセットは「デザイン内容の指紋（designSignature）が変わったときだけ」**（Codex 9巡目）。
   onEditorChange は位置タブ切替でも発火するため、無条件リセットにすると
   「入稿書き出し→位置を眺める→注文」で番号がズレる。指紋は商品/色/designs
   （画像hrefは長さ+先頭48字に短縮してstringify）。商品切替・読込・共有読込は明示リセット。
+  **名簿の編集・有効切替でもリセット**（renderRosterUI の rosterSig。デザイン指紋は名簿を含まないため・Codex 11巡目）。
 - **注文添付には指示書HTML（specSheetHTML）も同梱**（buildOrderFiles・名簿モード含む）。
   店舗が受け取る製作情報の本体。SVG/PNG/JSONだけに戻さない。
 - **刺繍の潰れ判定（minTextMm）は1文字の高さ**：複数行は行数、縦書きは1列の文字数で
@@ -139,7 +142,8 @@
 - **背景透過・元に戻すの適用先は「依頼時のオブジェクトID」**（`Editor.updateObjectById`）。
   updateSelected に戻すと、非同期処理中に選択が移った場合に別オブジェクトを上書きする。
   対象が削除済みなら警告トーストのみ（成功トーストを出さない）。
-- **注文本文の添付案内は ORDER.attachFiles に連動**（orderText）。OFF運用で「添付します」と書くと
+- **注文本文の添付案内は ORDER.attachFiles に連動**（orderText）。**メールフォールバックの完了画面も
+  実際のDLファイル数に連動**（showOrderComplete の attachedCount・Codex 11巡目）。OFF運用で「添付します」と書くと
   店舗が存在しないファイルを待つ。setup.html のテスト送信は attachFiles 時に**小さなZIPを実際に添付**して
   「本文は通るが添付で落ちる」プラン制限を開業前に検出する。
 - **マウスの役割は「左=クリック（選択/解除）のみ、右=ドラッグ全般（オブジェクト移動＋表示パン）」**

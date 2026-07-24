@@ -1422,6 +1422,12 @@
     const active = $("#rosterActive").checked;
     app.roster.active = active;
     app.roster.entries = parseRoster($("#rosterText").value);
+    /* 名簿の内容・有効状態が変わったら注文番号も発番し直す。デザイン指紋
+     * （designSignature）は名簿を含まないため、名簿だけ編集して再注文すると
+     * 別内容の個別SVGが同じ注文番号で届き、店舗側の突き合わせが狂う */
+    const rosterSig = (active ? "1" : "0") + "|" + JSON.stringify(app.roster.entries);
+    if (app.lastRosterSig !== undefined && rosterSig !== app.lastRosterSig) app.orderNo = null;
+    app.lastRosterSig = rosterSig;
     const n = app.roster.entries.length;
     const sizes = rosterQuantities();
     const sizeStr = Object.entries(sizes).map(([s, c]) => `${s}:${c}`).join(" / ");
@@ -1717,7 +1723,7 @@
     } else {
       // フォールバック：メール下書き＋本文コピー＋入稿データDL
       openMailFallback(order, files);
-      showOrderComplete(order, false);
+      showOrderComplete(order, false, CONFIG.ORDER.attachFiles && files ? files.length : 0);
     }
   }
 
@@ -1837,8 +1843,11 @@
       : "";
   }
 
-  /* 注文完了（または送信手順の案内）画面をオーバーレイ表示 */
-  function showOrderComplete(order, autoSent) {
+  /* 注文完了（または送信手順の案内）画面をオーバーレイ表示。
+   * attachedCount: メールフォールバック時に実際に自動DLした入稿ファイル数。
+   * 0件（attachFiles=OFF や生成失敗）なのに「添付してください」と案内すると、
+   * 存在しないファイルをお客様と店舗の双方が待ってしまう（Codex 11巡目） */
+  function showOrderComplete(order, autoSent, attachedCount = 0) {
     const el = $("#orderComplete");
     if (!el) return;
     const to = (CONFIG.ORDER && CONFIG.ORDER.toEmail) || SHOP.email;
@@ -1848,7 +1857,11 @@
       <p class="oc-no">注文番号：<b>${escapeHtml(order.orderNo)}</b></p>
       ${autoSent
         ? `<p>担当者より${escapeHtml(order.contact.email)}宛に確認のご連絡をいたします。デザイン確認後、正式なお見積もり・納期をご案内します。</p>`
-        : `<p>開いたメールを<b>そのまま送信</b>してください。入稿データ（SVG・PNG・JSON）は自動でダウンロードされました。メールに<b>添付</b>してお送りください。</p>
+        : `<p>開いたメールを<b>そのまま送信</b>してください。${
+            attachedCount
+              ? "入稿データ（SVG・PNG・JSON）は自動でダウンロードされました。メールに<b>添付</b>してお送りください。"
+              : "添付ファイルは不要です。本文の注文内容をもとに店舗がデザインを確認してご連絡します。"
+          }</p>
            <p class="oc-fallback">メールが開かない場合は、下記の内容を <b>${escapeHtml(to)}</b> へお送りください。</p>
            <textarea class="oc-text" readonly rows="6">${escapeHtml(orderText(order))}</textarea>
            <button class="ghost-btn small" id="ocCopy">📋 本文をコピー</button>`}
@@ -1943,18 +1956,17 @@
         ? await inflate(b64urlDecode(raw))
         : new TextDecoder().decode(b64urlDecode(raw));
       const data = JSON.parse(json);
-      /* 共有デザインの読み込みで、閲覧者が作業中の自動保存を消さない
-       * （実際に編集を始めるまで autosave をロックする） */
       /* 共有デザインの読み込みで、受け手の作業中データ（自動保存）を消さない。
-       * shareLocked の間は自動保存をスキップし、受け手が実際に編集を始めた最初の
-       * 変更でロック解除して保存する。shareLoadPending は「読込そのものが起こす
-       * 変更（＝保存すべきでない）」を1回だけ読み飛ばすための目印。
-       * ※onChange は 60ms デバウンスされるため、ここでの単純な cancel では防げない。 */
+       * shareLocked の間、自動保存は「内容の指紋が読込時と同じなら読込由来」と
+       * みなしてスキップし、指紋が変わった＝受け手の実編集を含む保存で初めて
+       * 解除して保存する。以前の「1回だけ読み飛ばす」方式は、読込直後500ms以内の
+       * 最初の編集がデバウンス窓で読込と合流したとき保存されなかった（Codex 11巡目）。
+       * ※onChange は 60ms デバウンスされるため、単純な cancel では防げない。 */
       shareLocked = true;
-      shareLoadPending = true;
-      if (!Editor.load(data)) { shareLocked = false; shareLoadPending = false; return false; }
+      if (!Editor.load(data)) { shareLocked = false; return false; }
       app.orderNo = null; /* 共有から読み込んだデザインは別注文として発番し直す */
       app.quantities = cleanQuantities(data.quantities || data.q);
+      shareLoadFP = shareFingerprint(); /* 読込直後の内容を記録（quantities反映後） */
       /* 共有リンクには個人情報を含めない方針のため、連絡先は復元しない */
       goStep(2);
       renderEditorPanels();
@@ -1974,14 +1986,25 @@
   /* ================= 自動保存 ================= */
 
   let shareLocked = false;
-  let shareLoadPending = false;
+  let shareLoadFP = "";
+
+  /* 共有読込ガード用の内容指紋（デザイン＋数量＋名簿）。
+   * 「読込が起こした保存」か「実編集を含む保存」かをタイミングでなく内容で見分ける */
+  function shareFingerprint() {
+    try {
+      return designSignature() + "|" + JSON.stringify(cleanQuantities(app.quantities)) +
+        "|" + JSON.stringify((app.roster && app.roster.entries) || []) +
+        ((app.roster && app.roster.active) ? "1" : "0");
+    } catch (e) { return "err"; }
+  }
 
   const autosave = debounce(() => {
     if (!Editor.state.product) return;
-    /* 共有リンクを開いた直後のガード：読込自体が起こす変更は保存せず、
-     * 受け手の実際の編集（次の変更）でロックを解除して保存する。 */
+    /* 共有リンクを開いた直後のガード：内容が読込時のままの保存はスキップし続け、
+     * 内容が変わった保存（＝受け手の実編集を含む）で解除して保存する。
+     * これなら読込直後の最初の編集がデバウンス窓で読込と合流しても失われない */
     if (shareLocked) {
-      if (shareLoadPending) { shareLoadPending = false; return; }
+      if (shareFingerprint() === shareLoadFP) return;
       shareLocked = false;
     }
     try {
