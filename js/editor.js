@@ -646,8 +646,11 @@
       return;
     }
 
-    /* 空白ドラッグ＝パン。動かず離した場合のみ選択解除（onPointerUpで判定） */
-    drag = { mode: "pan", startClient: { x: evt.clientX, y: evt.clientY }, startPanX: state.panX, startPanY: state.panY };
+    /* 空白ドラッグ＝パン（表示スクロール）。マウスは右ボタンのみ動かせる。
+     * 左ボタンは frozen（動かさない）にして「クリック＝選択解除」の判定だけに使う。
+     * 「左クリックではTシャツ（商品表示）も一切ドラッグさせない」というユーザー指定。
+     * タッチ・ペンは従来通り指ドラッグでパンできる */
+    drag = { mode: "pan", frozen: isMouse && !rightBtn, startClient: { x: evt.clientX, y: evt.clientY }, startPanX: state.panX, startPanY: state.panY };
     capture(evt);
   }
 
@@ -672,6 +675,7 @@
     if (!drag) return;
 
     if (drag.mode === "pan") {
+      if (drag.frozen) return; // 左ボタン: パンしない（movedも立てず、離した時の選択解除だけ生かす）
       const dx = evt.clientX - drag.startClient.x;
       const dy = evt.clientY - drag.startClient.y;
       if (Math.abs(dx) + Math.abs(dy) > 4) drag.moved = true;

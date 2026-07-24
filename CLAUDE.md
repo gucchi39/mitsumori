@@ -96,7 +96,7 @@
   （注文POST捕捉が要る回帰は `codex_server.mjs`・ポート8932）。サーバは Bash の run_in_background で起動する（`&` は死ぬ）。
 - 回帰セット: `codex5_test.mjs`(7・要8932)・`codex6_test.mjs`(5)・`codex7_test.mjs`(5)・`codex8_test.mjs`(11)・
   `codex9_test.mjs`(13)・`codex10_test.mjs`(14)・写真スモーク `smoke2.mjs`(26)・新機能 `features_test.mjs`(33)・
-  側面UI `ui3_fixes_test.mjs`(9)・版面ガード `calib_guard_test.mjs`(33)・着用 `worn_test.mjs`(11)。
+  側面UI `ui3_fixes_test.mjs`(11)・版面ガード `calib_guard_test.mjs`(33)・着用 `worn_test.mjs`(11)。
   コード変更時はユニット含め全部回してからコミットする。
 
 ## 過去に直した罠（再発させない）
@@ -142,7 +142,8 @@
 - **注文本文の添付案内は ORDER.attachFiles に連動**（orderText）。OFF運用で「添付します」と書くと
   店舗が存在しないファイルを待つ。setup.html のテスト送信は attachFiles 時に**小さなZIPを実際に添付**して
   「本文は通るが添付で落ちる」プラン制限を開業前に検出する。
-- **マウスの役割は「左=選択・ハンドル操作、右=移動ドラッグ」**（2026-07ユーザー指定。左右を入れ替えない）。
+- **マウスの役割は「左=クリック（選択/解除）のみ、右=ドラッグ全般（オブジェクト移動＋表示パン）」**
+  （2026-07ユーザー指定・2度確定。左ボタンでは商品表示のパンもさせない＝drag.frozen）。
   stage上は contextmenu 抑止。選択オーバーレイは枠・接続線が pointer-events:none／ハンドルだけ all
   （これを戻すと、選択中オブジェクトへの右ドラッグが枠線に横取りされて動かない）。タッチ・ペンは従来通り
   指ドラッグで移動。操作ヒント `.drag-hint` はマウス環境のみ表示（pointer:coarse では非表示）。
