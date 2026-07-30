@@ -1,0 +1,64 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [claude/embroidery-print-service-lakz9a, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    # 本番Pagesへ出すのは「リポジトリのデフォルトブランチ」への push のみ。
+    # （現在は作業ブランチがデフォルト。main をデフォルトに切り替えた後は
+    #   自動的に main のみがデプロイされ、他ブランチの push は無視される）
+    if: github.event_name == 'workflow_dispatch' || github.ref_name == github.event.repository.default_branch
+    concurrency:
+      group: pages
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      # 注意（初回セットアップ）: Pages が未有効のリポジトリでは、このジョブは
+      # 「Get Pages site failed」で失敗する。デフォルトの GITHUB_TOKEN では API から
+      # Pages を有効化できない（enablement: true は Resource not accessible by
+      # integration で失敗する実績あり）ため、初回のみ手動で
+      # Settings > Pages > Build and deployment > Source: GitHub Actions を選択すること。
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      # サイトが参照するファイルだけを別ディレクトリに集めてアップロードする。
+      # assets/products/src_* は写真再処理用の元画像（数十MB）で、サイトからは
+      # 未参照のため除外（毎回のアーティファクトを小さく・デプロイを速く保つ）。
+      - name: Stage site files (exclude photo sources)
+        run: |
+          mkdir -p /tmp/site
+          rsync -a \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude 'tests' \
+            --exclude 'assets/products/src_*' \
+            ./ /tmp/site/
+      # JS/CSS の参照URLへビルド版数（コミットSHA先頭8桁）を付与する。
+      # GitHub Pages は約10分キャッシュされるため、これが無いと更新直後に
+      # 「HTMLは新しいのに JS が旧版」という取り残しが起きる（実際に発生）。
+      # ローカル参照（コロンを含まないパス）のみ対象。https:// のCDN等は触らない。
+      - name: Cache-bust asset URLs (append build version)
+        run: |
+          V="${GITHUB_SHA::8}"
+          find /tmp/site -name '*.html' -print0 | xargs -0 sed -i -E \
+            "s/(src|href)=\"([^\":]+\.(js|css))\"/\1=\"\2?v=${V}\"/g"
+          grep -o 'src="[^"]*\.js[^"]*"' /tmp/site/index.html | head -5
+      - name: Upload site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: /tmp/site
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

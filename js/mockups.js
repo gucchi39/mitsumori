@@ -38,21 +38,109 @@
       C485 198 450 186 415 178`;
     const neckFront = `C404 214 350 232 350 232 C350 232 296 214 285 178 Z`;
     const neckBack  = `C404 190 350 197 350 197 C350 197 296 190 285 178 Z`;
+    const shape = `${body} ${view === "back" ? neckBack : neckFront}`;
     const collarFront = `M285 178 C296 214 350 232 350 232 C350 232 404 214 415 178
       C408 176 402 174 396 173 C388 200 350 214 350 214 C350 214 312 200 304 173 C298 174 292 176 285 178 Z`;
     const collarBack = `M285 178 C296 190 350 197 350 197 C350 197 404 190 415 178
       C408 176 402 174 396 173 C390 183 350 188 350 188 C350 188 310 183 304 173 C298 174 292 176 285 178 Z`;
-    const shading = `
-      <path d="M222 602 L222 340 C240 420 240 520 230 602 Z" fill="rgba(0,0,0,0.05)"/>
-      <path d="M478 602 L478 340 C460 420 460 520 470 602 Z" fill="rgba(0,0,0,0.05)"/>`;
+    const collar = view === "back" ? collarBack : collarFront;
+    /* 立体シェーディング（生地の丸み・脇の影・裾のたわみ）を本体色の上に重ねる */
+    const shade3d = `<g clip-path="url(#tsc)">
+      <rect x="80" y="170" width="540" height="450" fill="url(#tsg-vert)"/>
+      <rect x="80" y="170" width="540" height="450" fill="url(#tsg-side)"/>
+      <ellipse cx="350" cy="352" rx="158" ry="188" fill="url(#tsg-hi)"/>
+      <path d="M212 320 C244 344 254 386 248 430 C230 388 218 352 206 330 Z" fill="#000" opacity="0.06"/>
+      <path d="M488 320 C456 344 446 386 452 430 C470 388 482 352 494 330 Z" fill="#000" opacity="0.06"/>
+      <path d="M300 452 C306 508 301 556 296 600 L285 600 C292 552 295 508 291 454 Z" fill="#000" opacity="0.05"/>
+      <path d="M400 452 C394 508 399 556 404 600 L415 600 C408 552 405 508 409 454 Z" fill="#000" opacity="0.045"/>
+      <path d="M350 236 C330 250 318 268 314 300 C300 268 316 244 340 232 Z" fill="#000" opacity="0.05"/>
+    </g>`;
+    /* 襟のリブ（編み目）を細線で表現 */
+    const collarRibs = view === "back" ? "" :
+      `<path d="M312 196 C330 210 350 216 350 216 C350 216 370 210 388 196" fill="none" stroke="${shade(c, -0.22)}" stroke-width="1.4" opacity="0.6"/>`;
+    const defs = `<defs>
+      <clipPath id="tsc"><path d="${shape}"/></clipPath>
+      <radialGradient id="tsg-hi" cx="50%" cy="37%" r="44%">
+        <stop offset="0%" stop-color="#fff" stop-opacity="0.20"/>
+        <stop offset="55%" stop-color="#fff" stop-opacity="0.06"/>
+        <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+      </radialGradient>
+      <linearGradient id="tsg-side" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#000" stop-opacity="0.26"/>
+        <stop offset="15%" stop-color="#000" stop-opacity="0.02"/>
+        <stop offset="50%" stop-color="#000" stop-opacity="0"/>
+        <stop offset="85%" stop-color="#000" stop-opacity="0.02"/>
+        <stop offset="100%" stop-color="#000" stop-opacity="0.26"/>
+      </linearGradient>
+      <linearGradient id="tsg-vert" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#000" stop-opacity="0.12"/>
+        <stop offset="16%" stop-color="#000" stop-opacity="0"/>
+        <stop offset="82%" stop-color="#000" stop-opacity="0"/>
+        <stop offset="100%" stop-color="#000" stop-opacity="0.13"/>
+      </linearGradient>
+    </defs>`;
     return `${GROUND}
-      <path d="${body} ${view === "back" ? neckBack : neckFront}" fill="${c}" stroke="${E}" stroke-width="4" stroke-linejoin="round"/>
-      <path d="${view === "back" ? collarBack : collarFront}" fill="${R}" stroke="${E}" stroke-width="3" stroke-linejoin="round"/>
+      ${defs}
+      <path d="${shape}" fill="${c}" stroke="${E}" stroke-width="4" stroke-linejoin="round"/>
+      ${shade3d}
+      <path d="${collar}" fill="${R}" stroke="${E}" stroke-width="3" stroke-linejoin="round"/>
+      ${collarRibs}
       <path d="M192 210 C202 258 208 290 212 320" fill="none" stroke="${S}" stroke-width="3"/>
       <path d="M508 210 C498 258 492 290 488 320" fill="none" stroke="${S}" stroke-width="3"/>
       <path d="M226 588 L474 588" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5" fill="none"/>
-      <path d="M122 358 L206 326 M578 358 L494 326" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5" fill="none"/>
-      ${shading}`;
+      <path d="M122 358 L206 326 M578 358 L494 326" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5" fill="none"/>`;
+  }
+
+  /* ---------------- 袖ビュー（Tシャツを側面から見たシルエット） ----------------
+   * 参考サービスのように、シャツ全体を真横から見た自然な大きさで表示する。
+   * 上部が肩・半袖、下が胴・裾。版面（プリント範囲）は袖側の面にのる。
+   * 「袖だけ拡大」ではなく、シャツ1枚をそのまま側面表示。 */
+  function sleeveSide(c) {
+    const E = edge(c), S = seam(c), R = rib(c);
+    /* シャツの側面シルエット（1枚もの・大きめ）。前（左）に首の開き、
+     * 上に袖山、右へ背中、下に裾。 */
+    const shirt = `
+      M250 252
+      C252 224 262 202 280 192
+      C302 178 334 170 366 170
+      C416 170 456 204 474 256
+      C488 300 493 350 494 398
+      C496 478 493 552 487 580
+      Q483 608 449 609
+      L267 609
+      Q233 608 231 577
+      C225 500 227 398 233 340
+      C236 298 240 268 250 252 Z`;
+    /* 首の開き（側面から見た衿ぐり）：前上部の小さなえぐり */
+    const neck = `M258 250 C260 226 268 206 284 198 C298 191 312 196 316 208 C300 210 286 224 282 248 Z`;
+    return `${GROUND}
+      <defs>
+        <clipPath id="slsc"><path d="${shirt}"/></clipPath>
+        <radialGradient id="slg-hi" cx="48%" cy="36%" r="60%">
+          <stop offset="0%" stop-color="#fff" stop-opacity="0.20"/>
+          <stop offset="60%" stop-color="#fff" stop-opacity="0.05"/>
+          <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+        </radialGradient>
+        <linearGradient id="slg-side" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stop-color="#000" stop-opacity="0.16"/>
+          <stop offset="22%" stop-color="#000" stop-opacity="0"/>
+          <stop offset="78%" stop-color="#000" stop-opacity="0"/>
+          <stop offset="100%" stop-color="#000" stop-opacity="0.20"/>
+        </linearGradient>
+      </defs>
+      <path d="${shirt}" fill="${c}" stroke="${E}" stroke-width="4" stroke-linejoin="round"/>
+      <g clip-path="url(#slsc)">
+        <rect x="220" y="160" width="290" height="450" fill="url(#slg-side)"/>
+        <ellipse cx="350" cy="360" rx="170" ry="220" fill="url(#slg-hi)"/>
+        <!-- 首の開き（衿） -->
+        <path d="${neck}" fill="${R}" stroke="${S}" stroke-width="2"/>
+        <!-- 袖ぐり（袖と身頃の切り替え縫い目） -->
+        <path d="M300 196 C270 250 262 320 268 392 C272 448 288 520 312 574" fill="none" stroke="${S}" stroke-width="2.5"/>
+        <!-- 袖口（半袖の裾）＝袖側の面の下端 -->
+        <path d="M268 392 C320 372 430 372 470 388" fill="none" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5"/>
+        <!-- 裾リブ -->
+        <path d="M235 566 L485 566" stroke="${S}" stroke-width="2.5" stroke-dasharray="7 5"/>
+      </g>`;
   }
 
   /* ---------------- ポロシャツ ---------------- */
@@ -174,10 +262,146 @@
 
   /** モックアップのSVG内部マークアップを返す */
   function renderMockup(mockupId, colorHex, view) {
+    /* 袖ビュー（sleeveL/sleeveR）は、どの商品でも側面から見た袖を正面向きで大きく描く */
+    if (view && String(view).indexOf("sleeve") === 0) {
+      return `<g class="mockup">${sleeveSide(colorHex)}</g>`;
+    }
     const fn = MOCKUPS[mockupId];
     if (!fn) return "";
     return `<g class="mockup">${fn(colorHex, view || "front")}</g>`;
   }
 
-  globalThis.Mockups = { renderMockup, shade };
+  /* ---------------- 実写真モックアップ ----------------
+   * config.js の PRODUCTS に photos を設定すると、イラストの代わりに
+   * 実際の商品写真を表示できます（700×760の枠に収まるよう自動フィット）。
+   *   photos: { front: "assets/products/tshirt_front.png", back: "..." }
+   * 色ごとに写真を分ける場合:
+   *   photos: { white: { front: "...", back: "..." }, black: { ... } }
+   * 該当する写真が無い色・面は、自動的にイラストにフォールバックします。 */
+
+  function photoFor(product, colorId, view) {
+    const ph = product && product.photos;
+    if (!ph) return null;
+    const set = ph[colorId] && typeof ph[colorId] === "object" ? ph[colorId] : ph;
+    /* 要求された面の写真のみ返す（前面写真を背面に流用しない）。
+     * 無い面は null → イラスト表示＋printAreas にフォールバックする */
+    const url = set[view];
+    return typeof url === "string" && url ? url : null;
+  }
+
+  /* ---------------- 写真の自動カラー変更（グレー無地→各色） ----------------
+   * 1枚のグレー無地写真から、選択カラーに応じて色替えした見た目を作る。
+   * 生地のシワ・陰影（＝明度）を保ったまま色相・彩度だけ変える。
+   *   手順: いったんグレースケール化（明度L）→ 目標色でLを着色。
+   *   さらに baseLum（元写真の平均的な明るさ）で割ってスケールするので、
+   *   ネイビー等の濃色は暗く、白等の淡色は明るく、自然に振れる。 */
+  function photoTintFilter(id, colorHex, baseLum) {
+    const n = String(colorHex || "#808080").replace("#", "");
+    const num = parseInt(n.length === 3 ? n.split("").map((x) => x + x).join("") : n, 16);
+    const r = ((num >> 16) & 255) / 255, g = ((num >> 8) & 255) / 255, b = (num & 255) / 255;
+    const Lb = Math.max(0.15, Math.min(0.95, baseLum || 0.55));
+    const gr = r / Lb, gg = g / Lb, gb = b / Lb;            // 各チャンネルのゲイン
+    const lr = 0.2126, lg = 0.7152, lb = 0.0722;            // 輝度係数
+    const m = [
+      gr * lr, gr * lg, gr * lb, 0, 0,
+      gg * lr, gg * lg, gg * lb, 0, 0,
+      gb * lr, gb * lg, gb * lb, 0, 0,
+      0, 0, 0, 1, 0,
+    ].map((v) => Math.round(v * 10000) / 10000).join(" ");
+    return `<filter id="${id}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${m}"/></filter>`;
+  }
+
+  /** 商品のモックアップ（写真があれば写真、なければイラスト） */
+  function renderProductMockup(product, colorHex, colorId, view) {
+    const url = photoFor(product, colorId, view || "front");
+    if (url) {
+      const e = String(url).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+      const ph = product.photos;
+      let defs = "", fattr = "";
+      /* autoColor: グレー無地写真1枚を選択カラーへ自動で色替え。
+       * フィルタIDは商品・面・色で一意にする。SVGのfragment IDは文書全体で
+       * 解決されるため、id が "ptint-white" のように商品間で重複すると、
+       * 後続商品の url(#ptint-white) が先頭商品（baseLumが別）のフィルタに
+       * 解決されて色が崩れる（例：白ポロがTシャツのbaseLumで色替えされ白飛び）。 */
+      if (ph && ph.autoColor) {
+        const tid = "ptint-" + String((product.id || "p") + "-" + (view || "front") + "-" + (colorId || "x")).replace(/[^a-z0-9_-]/gi, "");
+        /* 面ごとに元写真の明度が異なる（前面グレー×背面白など）ため、
+         * baseLumByView があればその面の値を、無ければ商品共通の baseLum を使う。 */
+        const bl = (ph.baseLumByView && ph.baseLumByView[view || "front"] != null) ? ph.baseLumByView[view || "front"] : ph.baseLum;
+        defs = `<defs>${photoTintFilter(tid, colorHex, bl)}</defs>`;
+        fattr = ` filter="url(#${tid})"`;
+      }
+      return `<g class="mockup">${defs}<image href="${e}" xlink:href="${e}" x="0" y="0" width="700" height="760" preserveAspectRatio="xMidYMid meet"${fattr}/></g>`;
+    }
+    return renderMockup(product.mockup, colorHex, view);
+  }
+
+  /* ---------------- モデル着用イメージ（実写・服だけ色替え） ----------------
+   * wornPhotos[view] = { base, shirt, lum, img:{x,y,w,h}, map:{x,y,w,h} }
+   *  - base : 人物全体の切り抜き写真（肌・髪・パンツは元の色のまま表示）
+   *  - shirt: シャツ生地だけを抜いた同位置レイヤー。photoTintFilter で選択色に着色
+   *  - img  : ステージ(700x760)上の描画位置
+   *  - map  : この面のデザイン（実効版面座標）を写像する先の矩形。
+   *           縦横比は必ず実効版面と同じにする（デザインが歪まないように） */
+  function wornFor(product, view) {
+    const wp = product && product.wornPhotos;
+    return (wp && wp[view || "front"]) || null;
+  }
+
+  function renderWornMockup(product, colorHex, colorId, view) {
+    const w = wornFor(product, view);
+    if (!w) return "";
+    const e = (u) => String(u).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    /* フィルタIDは商品・面・色で一意（fragment IDは文書全体で解決されるため） */
+    const tid = "wtint-" + String((product.id || "p") + "-" + (view || "front") + "-" + (colorId || "x")).replace(/[^a-z0-9_-]/gi, "");
+    const at = `x="${w.img.x}" y="${w.img.y}" width="${w.img.w}" height="${w.img.h}" preserveAspectRatio="xMidYMid meet"`;
+    return `<g class="mockup worn-photo"><defs>${photoTintFilter(tid, colorHex, w.lum)}</defs>
+      <ellipse cx="350" cy="742" rx="230" ry="16" fill="rgba(40,34,26,0.14)"/>
+      <image href="${e(w.base)}" xlink:href="${e(w.base)}" ${at}/>
+      <image href="${e(w.shirt)}" xlink:href="${e(w.shirt)}" ${at} filter="url(#${tid})"/>
+    </g>`;
+  }
+
+  /* ---------------- 着用イメージ（背景＋トルソー） ----------------
+   * 商品の「後ろ」に置く、スタジオ背景と首・肩のマネキン形。
+   * アパレルは着用感、キャップは頭にかぶせた感じを演出します。 */
+
+  const WEARABLE = { tshirt: 1, drytshirt: 1, polo: 1, hoodie: 1, cap: 1 };
+
+  function wornBackdrop(product, view) {
+    const bg = `
+      <defs>
+        <radialGradient id="wbg" cx="50%" cy="38%" r="75%">
+          <stop offset="0%" stop-color="#f3efe9"/>
+          <stop offset="60%" stop-color="#e7e1d8"/>
+          <stop offset="100%" stop-color="#d5cec3"/>
+        </radialGradient>
+      </defs>
+      <rect x="0" y="0" width="700" height="760" fill="url(#wbg)"/>
+      <ellipse cx="350" cy="690" rx="250" ry="30" fill="rgba(40,34,26,0.13)"/>`;
+
+    const skin = "#e9cbaa", skinSh = "#d3ad84";
+    let form = "";
+    const mk = product.mockup;
+
+    if (mk === "cap") {
+      /* 頭にかぶせたイメージ：頭部シルエット＋首 */
+      form = `
+        <ellipse cx="350" cy="300" rx="120" ry="140" fill="${skin}"/>
+        <path d="M250 360 Q350 470 450 360 L450 470 L250 470 Z" fill="${skin}"/>
+        <ellipse cx="350" cy="300" rx="120" ry="140" fill="none" stroke="${skinSh}" stroke-width="2" opacity=".5"/>`;
+    } else if (WEARABLE[mk]) {
+      /* 首＋肩のトルソー（頭は写さないマネキン風） */
+      const neckTop = view === "back" ? 150 : 138;
+      form = `
+        <path d="M300 ${neckTop} Q300 210 322 236 L378 236 Q400 210 400 ${neckTop} Q392 120 350 120 Q308 120 300 ${neckTop} Z" fill="${skin}"/>
+        <path d="M322 236 L378 236 Q372 250 350 252 Q328 250 322 236 Z" fill="${skinSh}" opacity=".6"/>
+        <path d="M150 300 Q250 250 350 250 Q450 250 550 300 L560 360 Q350 300 140 360 Z" fill="${skin}" opacity=".9"/>`;
+    }
+    return `<g class="worn-back" pointer-events="none">${bg}${form}</g>`;
+  }
+
+  function isWearable(product) { return !!(product && WEARABLE[product.mockup]); }
+
+  globalThis.Mockups = { renderMockup, renderProductMockup, photoFor, wornBackdrop, wornFor, renderWornMockup, isWearable, shade };
 })();

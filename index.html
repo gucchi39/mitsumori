@@ -7,7 +7,8 @@
 <meta name="description" content="Tシャツ・ポロシャツ・キャップなどにWEB上でデザインして、その場で自動見積もり。刺繍・シルクスクリーン・フルカラープリント対応。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Shippori+Mincho+B1:wght@600&family=Zen+Maru+Gothic:wght@700&family=Mochiy+Pop+One&family=Yuji+Syuku&family=Yomogi&family=Dela+Gothic+One&family=Anton&family=Playfair+Display:wght@600&family=Pacifico&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Shippori+Mincho+B1:wght@600&family=Zen+Maru+Gothic:wght@700&family=Mochiy+Pop+One&family=Yuji+Syuku&family=Yomogi&family=Dela+Gothic+One&family=Anton&family=Playfair+Display:wght@600&family=Pacifico&family=Zen+Kaku+Gothic+New:wght@700&family=Zen+Old+Mincho:wght@700&family=Kaisei+Tokumin:wght@700&family=M+PLUS+Rounded+1c:wght@800&family=Kiwi+Maru:wght@500&family=Potta+One&family=Hachi+Maru+Pop&family=Cherry+Bomb+One&family=RocknRoll+One&family=Reggae+One&family=Rampart+One&family=Train+One&family=Monomaniac+One&family=DotGothic16&family=Stick&family=Yuji+Mai&family=Yusei+Magic&family=Klee+One:wght@600&family=New+Tegomin&family=Kaisei+Decol:wght@700&family=Shippori+Antique+B1&family=Bebas+Neue&family=Oswald:wght@600&family=Montserrat:wght@800&family=Archivo+Black&family=Alfa+Slab+One&family=Russo+One&family=Black+Ops+One&family=Righteous&family=Bangers&family=Luckiest+Guy&family=Dancing+Script:wght@700&family=Caveat:wght@700&family=Permanent+Marker&family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧵</text></svg>">
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -23,6 +24,11 @@
     <li data-step="3"><span class="num">3</span>お見積もり</li>
   </ol>
   <div class="top-actions">
+    <a class="ghost-btn" href="works.html" title="制作事例・作品集を見る">👕 作品集</a>
+    <a class="ghost-btn" href="docs/manual.html" target="_blank" rel="noopener" title="使い方マニュアルを開く">❓ 使い方</a>
+    <button class="ghost-btn" id="btnNew" title="最初からやり直す">✚ 新規</button>
+    <button class="ghost-btn" id="btnShare" title="デザインをURLで共有">🔗 共有</button>
+    <button class="ghost-btn" id="btnMyDesigns" title="このブラウザに保存したデザイン一覧（リピート注文に）">📁 マイデザイン</button>
     <button class="ghost-btn" id="btnSave" title="デザインをファイルに保存">💾 保存</button>
     <label class="ghost-btn" title="保存したデザインを読み込み">📂 読込<input type="file" id="fileLoad" accept=".json" hidden></label>
   </div>
@@ -35,6 +41,12 @@
     <div class="step1-inner">
       <h1>商品を選んで、その場でデザイン＆お見積もり</h1>
       <p class="lead">Illustratorなどの専用ソフトは不要。テキスト・スタンプ・画像で誰でも簡単にデザインでき、刺繍・プリントの概算金額がすぐに分かります。</p>
+      <div class="flow-strip">
+        <span><b>1</b> 商品・カラーを選ぶ</span>
+        <span><b>2</b> テンプレや文字でデザイン</span>
+        <span><b>3</b> 枚数を入れて自動見積もり</span>
+        <span><b>4</b> 見積書印刷・リンク共有</span>
+      </div>
       <div id="restoreBanner" class="restore-banner" hidden>
         <span>前回作成中のデザインがあります。</span>
         <button class="primary-btn small" id="btnRestore">続きから再開する</button>
@@ -50,6 +62,7 @@
 
       <nav class="toolrail" id="toolrail">
         <button data-tab="color" class="active"><span class="tr-icon">👕</span>カラー</button>
+        <button data-tab="template"><span class="tr-icon">📐</span>テンプレ</button>
         <button data-tab="text"><span class="tr-icon">Ｔ</span>テキスト</button>
         <button data-tab="stamp"><span class="tr-icon">★</span>スタンプ</button>
         <button data-tab="image"><span class="tr-icon">⬆</span>画像</button>
@@ -59,6 +72,10 @@
       <div class="toolpanel" id="toolPanel"></div>
 
       <div class="canvas-col">
+        <div class="position-bar">
+          <span class="pb-label">📍 プリント位置<small>（まずどこに入れるかを選択）</small></span>
+          <div class="pb-thumbs" id="positionBar"></div>
+        </div>
         <div class="canvas-toolbar">
           <div class="ct-group">
             <button id="btnUndo" title="もどる (元に戻す)">↩ もどる</button>
@@ -71,15 +88,19 @@
           </div>
           <div class="ct-group">
             <button id="btnGrid" title="グリッド表示">⊞ グリッド</button>
-            <button id="btnPreview" title="仕上がりプレビュー">👁 仕上がり</button>
+            <button id="btnPreview" title="仕上がりプレビュー（枠を消す）">👁 仕上がり</button>
+            <button id="btnWorn" title="着用イメージで見る">🧍 着用</button>
+            <button id="btnFullPreview" title="前面・背面をまとめて確認">🔍 全面</button>
           </div>
+          <div class="ct-group sel-actions" id="selActions" hidden>
+            <button id="saDup" title="複製（Ctrl+D）">⧉ 複製</button>
+            <button id="saCenter" title="プリント範囲の中央に配置">◎ 中央</button>
+            <button id="saFlip" title="左右反転（スタンプ・画像）">⇋ 反転</button>
+          </div>
+          <span class="drag-hint">🖱 デザインの移動は<b>右ボタンでドラッグ</b>（左クリック＝選択）</span>
         </div>
         <div class="canvas-wrap" id="canvasWrap">
           <svg id="stage" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 760"></svg>
-        </div>
-        <div class="position-bar">
-          <span class="pb-label">プリント位置</span>
-          <div class="pb-thumbs" id="positionBar"></div>
         </div>
       </div>
 
@@ -101,26 +122,89 @@
         <h2>数量を入力してください</h2>
         <p class="hint">数量が多いほど1枚あたりの単価が下がります（数量スライド）。</p>
         <div id="sizeInputs" class="size-inputs"></div>
-        <div class="customer-box">
-          <label>お名前（見積書の宛名・任意）
-            <input type="text" id="customerName" placeholder="例）株式会社サンプル 御中">
-          </label>
-        </div>
+
+        <details class="roster-box" id="rosterBox">
+          <summary>👕 チームユニフォーム（背番号・名前の一括入力）</summary>
+          <div class="roster-inner">
+            <p class="hint">
+              デザインの文字に <code>{名前}</code> <code>{番号}</code>（または <code>{NAME}</code> <code>{NUMBER}</code>）を入れておくと、
+              下の名簿の人数分、名前・番号を差し替えて一括生成します。数量は名簿から自動集計されます。
+            </p>
+            <label class="roster-toggle"><input type="checkbox" id="rosterActive"> 名簿を使う（数量を名簿から自動集計）</label>
+            <label class="tp-label" style="margin-top:10px">名簿（1行に「名前, 番号, サイズ」）</label>
+            <textarea id="rosterText" rows="5" placeholder="山田太郎, 10, L&#10;佐藤花子, 7, M&#10;鈴木一郎, 23, XL"></textarea>
+            <div class="roster-actions">
+              <button class="ghost-btn small" id="btnRosterPreview">🔍 名簿プレビュー</button>
+              <span class="roster-count" id="rosterCount"></span>
+            </div>
+            <div id="rosterTable" class="roster-table"></div>
+          </div>
+        </details>
+
         <div id="quoteAlerts"></div>
         <div class="design-summary" id="designSummary"></div>
+
+        <h2 class="form-head">ご注文者情報</h2>
+        <p class="hint">ご注文の場合は必須です（お見積もりのみの場合は不要）。</p>
+        <div class="contact-grid">
+          <label class="full">お名前・会社名 <span class="req">必須</span>
+            <input type="text" id="customerName" autocomplete="name" placeholder="例）山田 太郎">
+          </label>
+          <label>会社・団体名（任意）
+            <input type="text" id="ordCompany" autocomplete="organization" placeholder="例）株式会社サンプル">
+          </label>
+          <label>メール <span class="req">必須</span>
+            <input type="email" id="ordEmail" autocomplete="email" placeholder="例）you@example.com">
+          </label>
+          <label>電話番号 <span class="req">必須</span>
+            <input type="tel" id="ordTel" autocomplete="tel" placeholder="例）090-0000-0000">
+          </label>
+          <label>希望納期（任意）
+            <input type="text" id="ordDue" placeholder="例）○月○日まで">
+          </label>
+          <label>郵便番号（任意）
+            <input type="text" id="ordZip" autocomplete="postal-code" placeholder="000-0000">
+          </label>
+          <label class="full">納品先住所（任意）
+            <input type="text" id="ordAddr" autocomplete="street-address" placeholder="例）○○県○○市○○町 0-0-0">
+          </label>
+          <label class="full">ご要望・備考（任意）
+            <textarea id="ordNote" rows="2" placeholder="配置の希望、色味のご要望など"></textarea>
+          </label>
+        </div>
       </div>
 
       <div class="quote-result">
         <h2>お見積もり</h2>
         <div id="quoteBody"><p class="quote-empty">数量を入力すると自動で計算されます。</p></div>
+
         <div class="quote-actions">
-          <button class="primary-btn" id="btnPrint">🖨 見積書を印刷（PDF保存）</button>
-          <button class="ghost-btn" id="btnOrderMail">✉ この内容で注文・問い合わせ</button>
+          <button class="ghost-btn" id="btnPrint">🖨 見積書を印刷（PDF保存）</button>
+        </div>
+
+        <div class="prod-box">
+          <h3>入稿・製造用データ</h3>
+          <p class="hint">Illustratorでそのまま使える原寸ベクター等を書き出します。</p>
           <div class="dl-row">
+            <button class="ghost-btn small" id="btnProductionSet">📦 入稿データ一式</button>
+            <button class="ghost-btn small" id="btnSpec">📋 入稿指示書を印刷</button>
+          </div>
+          <div class="dl-row">
+            <button class="ghost-btn small" id="btnDlSvg">SVG（面別）</button>
             <button class="ghost-btn small" id="btnDlPng">PNG画像</button>
-            <button class="ghost-btn small" id="btnDlSvg">SVG（入稿用）</button>
             <button class="ghost-btn small" id="btnDlJson">デザインデータ</button>
           </div>
+        </div>
+
+        <div class="order-box">
+          <h3>ご注文</h3>
+          <div id="orderErrors"></div>
+          <label class="agree-row">
+            <input type="checkbox" id="ordAgree">
+            <span><a href="docs/terms.html" target="_blank" rel="noopener">利用規約・特定商取引法の表記</a>に同意し、デザインの使用権限があることを確認しました。</span>
+          </label>
+          <button class="primary-btn full" id="btnOrder">この内容で注文する ▶</button>
+          <p class="order-note">※ ボタンを押すと、入稿データを添えて当社にご注文内容が送信されます（またはメールが開きます）。この時点では料金は発生しません。デザイン確認後に正式なお見積もり・納期をご案内します。</p>
         </div>
       </div>
     </div>
@@ -143,10 +227,33 @@
 <!-- ============ 見積書（印刷用） ============ -->
 <div id="quoteSheet" class="quote-sheet" aria-hidden="true"></div>
 
+<!-- ============ 注文完了オーバーレイ ============ -->
+<div id="orderComplete" class="order-complete" hidden>
+  <div class="oc-card"><div class="oc-inner"></div></div>
+</div>
+
+<!-- ============ 全面プレビュー ============ -->
+<div id="fullPreview" class="order-complete" hidden>
+  <div class="oc-card fp-card"><div class="fp-inner"></div></div>
+</div>
+
+<!-- ============ 名簿プレビュー ============ -->
+<div id="rosterPreview" class="order-complete" hidden>
+  <div class="oc-card fp-card"><div class="rp-inner"></div></div>
+</div>
+
+<!-- ============ マイデザイン ============ -->
+<div id="myDesigns" class="order-complete" hidden>
+  <div class="oc-card fp-card"><div class="md-inner"></div></div>
+</div>
+
+<div id="toastBox" class="toast-box" aria-live="polite"></div>
+
 <script src="js/config.js"></script>
 <script src="js/quote.js"></script>
 <script src="js/mockups.js"></script>
 <script src="js/stamps.js"></script>
+<script src="js/templates.js"></script>
 <script src="js/editor.js"></script>
 <script src="js/app.js"></script>
 </body>
