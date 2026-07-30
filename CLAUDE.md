@@ -100,7 +100,7 @@
 - E2E: scratchpad に Playwright スクリプト群。静的サーバは `python3 -m http.server 8945`
   （注文POST捕捉が要る回帰は `codex_server.mjs`・ポート8932）。サーバは Bash の run_in_background で起動する（`&` は死ぬ）。
 - 回帰セット: `codex5_test.mjs`(7・要8932)・`codex6_test.mjs`(5)・`codex7_test.mjs`(5)・`codex8_test.mjs`(11)・
-  `codex9_test.mjs`(13)・`codex10_test.mjs`(14)・`codex11_test.mjs`(7)・`codex12_test.mjs`(10)・写真スモーク `smoke2.mjs`(26)・新機能 `features_test.mjs`(33)・
+  `codex9_test.mjs`(13)・`codex10_test.mjs`(14)・`codex11_test.mjs`(7)・`codex12_test.mjs`(10)・`codex13_test.mjs`(9)・写真スモーク `smoke2.mjs`(26)・新機能 `features_test.mjs`(33)・
   側面UI `ui3_fixes_test.mjs`(11)・版面ガード `calib_guard_test.mjs`(33)・着用 `worn_test.mjs`(21)。
   コード変更時はユニット含め全部回してからコミットする。
 

@@ -839,7 +839,7 @@
    * 比例フォントで幅広グリフ（例: W）が少数でも、その行が最大幅なら確実に選ばれる。
    * 縦書き・複数オブジェクト等の取りこぼし対策に、文字数上位も併せて採る。 */
   function rosterMeasureEntries() {
-    const valid = app.roster.entries.filter((e) => e.sizeOk !== false);
+    const valid = app.roster.entries.filter(rosterEntryValid);
     if (valid.length <= 60) return valid;
     const base = Editor.serialize().designs || {};
     const textObjs = [];
@@ -1244,6 +1244,7 @@
   function parseRoster(text) {
     const p = Editor.state.product;
     const validSizes = p ? p.sizes : [];
+    const ph = placeholderKinds();
     return String(text || "").split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
       const parts = line.split(/[,、\t]/).map((s) => s.trim());
       const raw = (parts[2] || "").toUpperCase();
@@ -1253,19 +1254,31 @@
         else if (!raw && validSizes.includes("FREE")) size = "FREE"; // サイズ欄なし×フリーサイズ商品はOK
         else sizeOk = false;
       }
-      return { name: parts[0] || "", number: parts[1] || "", size, sizeOk };
+      const name = parts[0] || "", number = parts[1] || "";
+      /* デザインが {名前}/{番号} を使うなら、その値が空の行は製作不可
+       * （差し込むと必要な文字が空欄の入稿SVGになるため・Codex 13巡目） */
+      const nameOk = !ph.name || name.length > 0;
+      const numberOk = !ph.number || number.length > 0;
+      return { name, number, size, sizeOk, nameOk, numberOk };
     });
   }
 
-  /* 名簿からサイズ別数量を集計（サイズ不明の行は数えない） */
+  /* 名簿からサイズ別数量を集計（不備の行＝サイズ不明・必要な差し込み値が空 は数えない） */
   function rosterQuantities() {
     const q = {};
-    for (const e of app.roster.entries) if (e.sizeOk !== false) q[e.size] = (q[e.size] || 0) + 1;
+    for (const e of app.roster.entries) if (rosterEntryValid(e)) q[e.size] = (q[e.size] || 0) + 1;
     return q;
   }
 
+  /* 製作不可の行と、その理由を返す（サイズ不明／{名前}が空／{番号}が空） */
   function rosterBadRows() {
-    return app.roster.entries.map((e, i) => ({ ...e, row: i + 1 })).filter((e) => e.sizeOk === false);
+    return app.roster.entries.map((e, i) => ({ ...e, row: i + 1 })).filter((e) => !rosterEntryValid(e)).map((e) => {
+      const why = [];
+      if (e.sizeOk === false) why.push(`サイズ「${e.size || "未入力"}」`);
+      if (e.nameOk === false) why.push("名前が空");
+      if (e.numberOk === false) why.push("番号が空");
+      return { ...e, why: why.join("・") };
+    });
   }
 
   function rosterActive() {
@@ -1432,6 +1445,25 @@
     return Object.values(d).some((a) => (a.objects || []).some((o) => o.type === "text" && /\{(名前|NAME|番号|NUMBER|背番号)\}/i.test(o.text || "")));
   }
 
+  /* デザインが使っている差し込みの種類（名前・番号）を判定。
+   * 名簿の各行に、その差し込みに必要な値が入っているかの検証に使う（Codex 13巡目）。 */
+  function placeholderKinds() {
+    const d = Editor.serialize().designs || {};
+    let name = false, number = false;
+    for (const a of Object.values(d)) for (const o of (a.objects || [])) {
+      if (o.type !== "text") continue;
+      const t = o.text || "";
+      if (/\{(名前|NAME)\}/i.test(t)) name = true;
+      if (/\{(番号|NUMBER|背番号)\}/i.test(t)) number = true;
+    }
+    return { name, number };
+  }
+
+  /* 名簿1行が製作可能か（サイズ・必要な差し込み値がそろっているか）。 */
+  function rosterEntryValid(e) {
+    return e.sizeOk !== false && e.nameOk !== false && e.numberOk !== false;
+  }
+
   function renderRosterUI() {
     const box = $("#rosterBox");
     if (!box) return;
@@ -1449,21 +1481,18 @@
     const sizeStr = Object.entries(sizes).map(([s, c]) => `${s}:${c}`).join(" / ");
     $("#rosterCount").textContent = n ? `${n}名（${sizeStr}）` : "名簿が空です";
 
-    /* テーブル表示 */
+    /* テーブル表示（不備セルは赤で警告） */
+    const cell = (okFlag, val) => okFlag === false
+      ? `<b style="color:#d33">⚠ ${escapeHtml(val) || "未入力"}</b>` : escapeHtml(val);
     $("#rosterTable").innerHTML = n
       ? `<table><thead><tr><th>#</th><th>名前</th><th>番号</th><th>サイズ</th></tr></thead><tbody>${
-          app.roster.entries.map((e, i) => `<tr><td>${i + 1}</td><td>${escapeHtml(e.name)}</td><td>${escapeHtml(e.number)}</td><td>${
-            e.sizeOk === false
-              ? `<b style="color:#d33">⚠ ${escapeHtml(e.size) || "未入力"}</b>`
-              : escapeHtml(e.size)
-          }</td></tr>`).join("")
+          app.roster.entries.map((e, i) => `<tr><td>${i + 1}</td><td>${cell(e.nameOk, e.name)}</td><td>${cell(e.numberOk, e.number)}</td><td>${cell(e.sizeOk, e.size)}</td></tr>`).join("")
         }</tbody></table>`
       : "";
 
     const bad = rosterBadRows();
     if (bad.length) {
-      const p = Editor.state.product;
-      $("#rosterTable").insertAdjacentHTML("afterbegin", `<div class="alert warn" style="margin-bottom:8px">⚠ サイズが不明な行があります（${bad.map((b) => `${b.row}行目`).join("・")}）。この商品のサイズ：<b>${(p ? p.sizes : []).map(escapeHtml).join(" / ")}</b>。修正されるまでこの行は数量に含まれず、ご注文に進めません。</div>`);
+      $("#rosterTable").insertAdjacentHTML("afterbegin", `<div class="alert warn" style="margin-bottom:8px">⚠ 不備のある行があります（${bad.map((b) => `${b.row}行目：${escapeHtml(b.why)}`).join("／")}）。修正されるまでこの行は数量に含まれず、ご注文に進めません。</div>`);
     }
 
     if (active && !hasPlaceholders()) {
@@ -1541,9 +1570,15 @@
   async function downloadProductionSet() {
     const p = Editor.state.product;
     if (!p) return;
+    /* 名簿の遅延反映を書き出し前に確定（Codex 13巡目） */
+    if ($("#rosterActive")) renderRosterUI();
     const areas = Editor.designAreas();
     if (!areas.length) { toast("先にデザインを作成してください", "warn"); return; }
     if (rosterCheckedButEmpty()) { toast("「名簿を使う」にチェックがありますが名簿が空です。名前・番号・サイズを入力してください", "warn"); return; }
+    if (rosterActive()) {
+      const bad = rosterBadRows();
+      if (bad.length) { toast(`名簿に不備のある行があります（${bad.map((b) => `${b.row}行目：${b.why}`).join("・")}）。修正してください`, "warn"); return; }
+    }
     const no = orderNumber();
     let n = 0;
 
@@ -1688,13 +1723,25 @@
     const p = Editor.state.product;
     if (!p) errs.push("商品が選択されていません。");
     if (!hasAnyDesign()) errs.push("デザインが作成されていません。");
+    /* オブジェクトはあるが実際にプリントされる内容が無い（文字が空欄・範囲外など）
+     * 場合もブロックする。hasAnyDesign はオブジェクト数だけを見るため、空文字だけの
+     * デザインが「無地の入稿データ」で通ってしまう（Codex 13巡目）。 */
+    else if (p && !rosterActive() && !Editor.getPlacements().length) {
+      errs.push("プリントされる内容がありません。文字が空欄になっていないか、デザインがプリント範囲内にあるかご確認ください。");
+    }
     const eq = effectiveQuantities();
     const totalQty = p ? p.sizes.reduce((s, sz) => s + cleanQty(eq[sz]), 0) : 0;
     if (rosterCheckedButEmpty()) errs.push("「名簿を使う」にチェックが入っていますが、名簿が空です。名前・番号・サイズを入力するか、チェックを外してください。");
     else if (totalQty < 1) errs.push(rosterActive() ? "名簿が空です。名前・番号・サイズを入力してください。" : "数量が入力されていません。");
+    /* 店舗設定の最小注文枚数を下回る等、見積そのものが成立しない場合はブロック。
+     * computeQuote は minOrderQty 未満で ok:false（amountTotal も出ない）を返すが、
+     * 従来はここが素通りだった（Codex 13巡目）。 */
+    else if (SHOP.minOrderQty > 1 && totalQty < SHOP.minOrderQty) {
+      errs.push(`ご注文は最小 ${SHOP.minOrderQty} 枚からです（現在 ${totalQty} 枚）。`);
+    }
     if (rosterActive()) {
       const bad = rosterBadRows();
-      if (bad.length) errs.push(`名簿にサイズが不明な行が${bad.length}行あります（${bad.map((b) => `${b.row}行目「${b.size || "未入力"}」`).join("、")}）。この商品のサイズ：${p ? p.sizes.join(" / ") : ""}`);
+      if (bad.length) errs.push(`名簿に不備のある行が${bad.length}行あります（${bad.map((b) => `${b.row}行目：${b.why}`).join("、")}）。この商品のサイズ：${p ? p.sizes.join(" / ") : ""}`);
       /* 差し込み文字が無いと全員同じ仕上がりの入稿データが生成されてしまう */
       if (!hasPlaceholders()) errs.push("名簿を使う場合は、デザインの文字に {名前} または {番号}（{NAME}/{NUMBER}も可）を入れてください。STEP2のテキストで設定できます。");
     }
@@ -1708,6 +1755,11 @@
   }
 
   async function submitOrder() {
+    /* 名簿入力は250msデバウンスのため、貼り付け直後に注文を押すと古い名簿で
+     * 検証・数量・入稿データが作られる。押下時点のテキストを同期反映してから
+     * 検証する（Codex 13巡目）。renderRosterUI は refreshQuote までは呼ばないため
+     * 見積も更新しておく。 */
+    if ($("#rosterActive")) { renderRosterUI(); refreshQuote(); }
     const errs = validateOrder();
     if (errs.length) {
       renderOrderErrors(errs);
@@ -2033,7 +2085,16 @@
         roster: app.roster,
         savedAt: Date.now(),
       }));
-    } catch (e) { /* 容量超過などは無視（画像入りは localStorage 上限に注意） */ }
+      app.autosaveWarned = false; // 保存に成功したら警告状態を解除
+    } catch (e) {
+      /* 容量超過（大きな画像入りデザインは localStorage 上限を超えやすい）で
+       * 自動保存が黙って失敗すると、後で「自動保存されているはず」と復元して
+       * 作業が消える。1度だけ明示的に警告し、手動保存を促す（Codex 13巡目）。 */
+      if (!app.autosaveWarned) {
+        app.autosaveWarned = true;
+        toast("自動保存できませんでした（画像が大きい可能性があります）。「💾 保存」でファイルに保存してください", "warn");
+      }
+    }
   }, 500);
 
   function checkAutosave() {

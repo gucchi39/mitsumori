@@ -1413,7 +1413,14 @@
        * ブラウザの右クリックメニューを出さない（ページ他所は通常通り） */
       svg.addEventListener("contextmenu", (e) => e.preventDefault());
       document.addEventListener("keydown", onKeyDown);
-      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => render());
+      /* Webフォント読込完了後は再描画だけでなく採寸もやり直す。低速回線では
+       * フォント到着前に置かれた/読み込まれた文字が代替フォントで測られ、
+       * 見積・サイズ区分・超過警告が代替フォント基準のまま固定される（Codex 13巡目）。
+       * onChange は見積再計算（refreshQuote）を含む。 */
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => {
+        render();
+        if (callbacks.onChange) callbacks.onChange();
+      });
     },
 
     setProduct(product, colorId, keepDesigns) {
